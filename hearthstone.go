@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/ActiveState/tail"
 	"os"
@@ -309,7 +310,11 @@ func loadCardJson() {
 func main() {
 	loadCardJson()
 
-	log, _ := tail.TailFile("/Users/fellows/Library/Logs/Unity/Player.log", tail.Config{Follow: true})
+	hsLogFile := flag.String("log", "no-log-file-specified", "The file path to the Hearthstone log file.")
+
+	flag.Parse()
+
+	log, _ := tail.TailFile(*hsLogFile, tail.Config{Follow: true})
 	startOfTurnString := `[Power] GameState.DebugPrintPower() - TAG_CHANGE Entity=GameEntity tag=STEP value=MAIN_ACTION`
 	lineParsers := []LineParser{
 		LineParser{applyManaUpdate, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
