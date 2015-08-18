@@ -116,7 +116,10 @@ type GameState struct {
 }
 
 type Move struct {
-	applyMove func(gs *GameState) *GameState // Returns a copy
+	ApplyMove func(gs *GameState) *GameState // Returns a copy
+  IdOne int32
+  IdTwo int32
+  Description string
 }
 
 type DecisionTreeNode struct {
