@@ -40,7 +40,21 @@ var GlobalCardPlayedActions = map[string]func(gs *GameState, params *MoveParams)
 // TODO fill in
 }
 
+func getCardPlayedAction(card *Card) func(gs *GameState, params *MoveParams) {
+	if action, ok := GlobalCardPlayedActions[card.JsonCardId]; ok {
+		return action
+	}
+	return func(gs *GameState, params *MoveParams) {}
+}
+
 // All deathrattle actions we care about.  The action should modify `gs`
 var GlobalDeathrattleActions = map[string]func(gs *GameState, params *MoveParams){
 // TODO fill in
+}
+
+func getDeathrattleAction(card *Card) func(gs *GameState, params *MoveParams) {
+	if action, ok := GlobalDeathrattleActions[card.JsonCardId]; ok {
+		return action
+	}
+	return func(gs *GameState, params *MoveParams) {}
 }
