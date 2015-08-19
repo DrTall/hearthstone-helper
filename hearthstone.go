@@ -1,11 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/ActiveState/tail"
 	"time"
 )
+
+func prettyPrint(x interface{}) {
+	json, _ := json.MarshalIndent(x, "", "  ")
+	fmt.Println(string(json))
+}
 
 func main() {
 	hsLogFile := flag.String("log", "no-log-file-specified", "The file path to the Hearthstone log file.")
@@ -25,7 +31,7 @@ func main() {
 				fmt.Println("It is the start of turn for:", gs.LastManaAdjustPlayer)
 				newAbortChan := make(chan time.Time, 1)
 				abortChan = &newAbortChan
-				go WalkDecisionTree(successChan, newAbortChan)
+				go WalkDecisionTree(gs.DeepCopy(), successChan, newAbortChan)
 			} else if somethingHappened && abortChan != nil {
 				*abortChan <- time.Now()
 				abortChan = nil

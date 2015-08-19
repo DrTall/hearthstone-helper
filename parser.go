@@ -3,7 +3,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -19,7 +18,7 @@ var (
 		LineParser{applyTagChange, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
 			`TAG_CHANGE .*id=(?P<instance_id>\d+).*cardId=(?P<class_id>\S+).*tag=(?P<tag_name>ATK|ARMOR|COST|DAMAGE|FROZEN|HEALTH|TAUNT|SILENCED) value=(?P<tag_value>.*)`)},
 		LineParser{applyTagChangeNoJsonId, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
-			`TAG_CHANGE .*id=(?P<instance_id>\d+).*tag=(?P<tag_name>ATK|ARMOR|COST|DAMAGE|FROZEN|HEALTH|TAUNT|SILENCED) value=(?P<tag_value>.*)`)},
+			`TAG_CHANGE .*id=(?P<instance_id>\d+).*tag=(?P<tag_name>ATK|ARMOR|COST|DAMAGE|EXHAUSTED|FROZEN|HEALTH|TAUNT|SILENCED) value=(?P<tag_value>.*)`)},
 		//LineParser{applyDebugWriteLine, regexp.MustCompile(`\[Zone\] ZoneChangeList.ProcessChanges\(\) -\s+` +
 		//  `id=.* local=.* \[name=(?P<name>.*) id=(?P<instanceId>.*) zone=.* zonePos=.* cardId=(?P<class_id>.*) player=(?P<player_id>.*)\] zone from (?P<zome_from>.*) -> (?P<zome_to>.*)`)},
 		LineParser{applyZoneChange, regexp.MustCompile(`\[Zone\] ZoneChangeList.ProcessChanges\(\) -\s+` +
@@ -69,11 +68,6 @@ func applyDebugWriteLine(args *LineParserApplyArgs) {
 	} else {
 		fmt.Println("DEBUG:", args.line)
 	}
-}
-
-func prettyPrint(x interface{}) {
-	json, _ := json.MarshalIndent(x, "", "  ")
-	fmt.Println(string(json))
 }
 
 func applyNewGame(args *LineParserApplyArgs) {
@@ -132,6 +126,8 @@ func applyTagChange(args *LineParserApplyArgs) {
 		card.Damage = tag_value
 	case "EXHAUSTED":
 		card.Exhausted = tag_value == 1
+  case "FROZEN":
+    card.Frozen = tag_value == 1
 	case "HEALTH":
 		card.Health = tag_value
 	case "TAUNT":
