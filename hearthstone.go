@@ -131,11 +131,16 @@ type GameState struct {
 	LastManaAdjustPlayer string
 }
 
-type Move struct {
-	ApplyMove   func(gs *GameState) *GameState // Returns a copy
+// parameters that apply to all moves.  IdTwo is optional.  When it exists, it is the target (of an attack, spell, etc)
+type MoveParams struct {
 	IdOne       int32
 	IdTwo       int32
 	Description string
+}
+
+type Move struct {
+	ApplyMove   func(gs *GameState, params *MoveParams) *GameState // Returns a copy of the gamestate
+	params      MoveParams
 }
 
 type DecisionTreeNode struct {
