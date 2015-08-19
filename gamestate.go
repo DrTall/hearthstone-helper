@@ -2,6 +2,25 @@
 
 package main
 
+import "fmt"
+
+// All functions that we care about/ know about for when a card (key of the map is JsonId)
+// is played with optional target `targetCardId`  The action should modify `gs`
+// This applies only to spells & enchantments (TODO (dz): verify)
+var GlobalCardPlayedActions = map[string]func(gs *GameState, targetCardId int32) {
+	// TODO fill in
+}
+
+// All deathrattle actions we care about.  The action should modify `gs`
+var GlobalDeathrattleActions = map[string]func(gs *GameState, targetCardId int32) {
+	// TODO fill in
+}
+
+// All battelcry actions we care about.  The action should modify `gs`
+var GlobalBattlecryActions = map[string]func(gs *GameState, targetCardId int32) {
+	// TODO fill in
+}
+
 type GameState struct {
 	CardsById            map[int32]*Card
 	CardsByZone          map[string]map[*Card]interface{}
@@ -59,6 +78,75 @@ func (gs *GameState) moveCard(card *Card, newZone string) {
 	//fmt.Println("BEFORE HELLO!!!", gs)
 	//prettyPrint(gs)
 }
+
+// -------------------
+// "hypothetical" operations on GameState that modify it.
+// These can be used as the function `applyMove` in `Move`.
+// -------------------
+
+// use a card: either playing from hand, or using hero power
+func (gs *GameState) useCard(params *MoveParams) {
+	playCardId := params.IdOne
+	playCard := gs.CardsById[playCardId]
+	playCardData := GlobalCardJsonData[playCard.JsonCardId]
+	switch playCard.Zone {
+		// If played from hand
+		case "FRIENDLY HAND":
+			switch playCardData.Type {
+				case "Minion":
+					// play minion
+					gs.moveCard(playCard, "FRIENDLY PLAY")
+					// TODO (dz): execute battlecry
+				case "Spell":
+					// execute spell
+					// TODO (dz): execute spell effect
+					gs.moveCard(playCard, "FRIENDLY GRAVEYARD")
+				case "Weapon":
+					// remove anything currently in weapon zone
+					if weapons, exists := gs.CardsByZone["FRIENDLY PLAY (Weapon)"]; exists {
+						if len(weapons) > 1 {
+							fmt.Println("more than one weapon in play??", weapons)
+						}
+						for oldWeapon, _ := range weapons {
+							gs.moveCard(oldWeapon, "FRIENDLY GRAVEYARD")
+						}
+					}
+					// new weapon to weapon zone
+					gs.moveCard(playCard, "FRIENDLY PLAY (Weapon)")
+				// TODO (dz): other card types (Enchantment?)
+			}
+		// If on battlefield, then this is a minion attack.
+		case "FRIENDLY PLAY":
+			// TODO (dz): is it easier for nextMoves to call use or attack?
+			fmt.Println("`useCard` called with a card on the field, using `attack` instead.")
+			gs.attack(params)
+		// if using hero attack
+		case "FRIENDLY PLAY (Hero)":
+			fmt.Println("`useCard` called with hero card, using `attack` instead.")
+			gs.attack(params)
+		// if using hero power
+		default:
+			fmt.Println("Unrecognized Zone to play a card from: ", playCard.Zone)
+	}
+}
+
+// Minion attack or weapon attack (modifies `gs` and the cards in it).
+func (gs *GameState) attack(params *MoveParams) {
+	cardOneId := params.IdOne
+	cardTwoId := params.IdTwo
+	// update their damage accordingly
+	cardOne := gs.CardsById[cardOneId]
+	cardTwo := gs.CardsById[cardTwoId]
+	cardOne.Damage = cardOne.Damage + cardTwo.Attack
+	cardTwo.Damage = cardTwo.Damage + cardOne.Attack
+	gs.cleanupState()
+}
+
+// Clean up the gs state, moving cards to their zones, executing deathrattles, etc
+func (gs *GameState) cleanupState() {
+	// TODO (dz)
+}
+
 
 // A particular instance of a card in the game.
 type Card struct {

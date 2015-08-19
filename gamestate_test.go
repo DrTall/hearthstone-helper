@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+  "fmt"
+  "testing"
+)
 
 func TestDeepCopy(t *testing.T) {
   gs := GameState{}
@@ -30,6 +33,34 @@ func TestDeepCopy(t *testing.T) {
     t.Error()
   }
   if c2.Health != 2 || c2.Zone != "MY_ZONE" {
+    t.Error()
+  }
+}
+
+func TestMove(t *testing.T) {
+  gs := GameState{}
+  gs.resetGameState()
+  c := gs.getOrCreateCard("GVG_112", 42)
+  gs.moveCard(c, "FRIENDLY HAND")
+
+  // create a move to test
+  moveParam := MoveParams{
+    IdOne: c.InstanceId,
+    IdTwo: 0,
+    Description: "test move",
+  }
+  gs.useCard(&moveParam)
+  fmt.Println(gs)
+
+  // Card should no longer be in hand
+  if hand, _ := gs.CardsByZone["FRIENDLY HAND"]; len(hand) != 0 {
+    t.Error()
+  }
+  // Card should now be in play
+  if hand, _ := gs.CardsByZone["FRIENDLY PLAY"]; len(hand) != 1 {
+    t.Error()
+  }
+  if c.Zone != "FRIENDLY PLAY" {
     t.Error()
   }
 }
