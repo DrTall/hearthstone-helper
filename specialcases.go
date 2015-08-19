@@ -69,7 +69,8 @@ func getCardPlayedAction(card *Card) func(gs *GameState, params *MoveParams) {
 
 // All deathrattle actions we care about.  The action should modify `gs`
 var GlobalDeathrattleActions = map[string]func(gs *GameState, params *MoveParams){
-// TODO fill in
+	"FP1_021": whirlwindAction, // Death's Bite
+	"FP1_024": whirlwindAction, // Unstable Ghoul
 }
 
 func getDeathrattleAction(card *Card) func(gs *GameState, params *MoveParams) {
