@@ -276,7 +276,6 @@ func newCardFromJson(jsonCardId string, instanceId int32) Card {
 		}
 	}
 	fmt.Printf("ERROR: Unknown jsonCardId: %v\n", jsonCardId)
-	panic("ohy noes")
 	return Card{
 		InstanceId: instanceId,
 		JsonCardId: jsonCardId,
