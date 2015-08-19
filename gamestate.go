@@ -29,17 +29,17 @@ type GameState struct {
 }
 
 // Can't just use deepcopy.Copy because of CardsByZone's pointer keys.
-func (gs *GameState) DeepCopy() (*GameState) {
-  result := GameState{}
-  result.resetGameState()
-  for id, cardPtr := range gs.CardsById {
-    cardCopy := *cardPtr
-    result.CardsById[id] = &cardCopy
-    result.moveCard(&cardCopy, cardCopy.Zone) // Populate CardsByZone
-  }
-  result.Mana = gs.Mana
-  result.LastManaAdjustPlayer = gs.LastManaAdjustPlayer
-  return &result
+func (gs *GameState) DeepCopy() *GameState {
+	result := GameState{}
+	result.resetGameState()
+	for id, cardPtr := range gs.CardsById {
+		cardCopy := *cardPtr
+		result.CardsById[id] = &cardCopy
+		result.moveCard(&cardCopy, cardCopy.Zone) // Populate CardsByZone
+	}
+	result.Mana = gs.Mana
+	result.LastManaAdjustPlayer = gs.LastManaAdjustPlayer
+	return &result
 }
 
 func (gs *GameState) resetGameState() {
@@ -152,6 +152,7 @@ func (gs *GameState) cleanupState() {
 type Card struct {
 	InstanceId int32  // Globally unique.
 	JsonCardId string // Refers to JsonCardData.Id
+	Type       string // Refers to JsonCardData.Type
 	Name       string // Refers to JsonCardData.Name
 	Cost       int32
 	Attack     int32

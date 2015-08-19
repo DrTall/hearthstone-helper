@@ -33,14 +33,14 @@ var (
 func ParseHearthstoneLogLine(line string, gs *GameState) (turnStart bool, somethingHappened bool) {
 	if match := startTurnPattern.FindStringSubmatch(line); len(match) > 0 {
 		turnStart = true
-    return
+		return
 	}
 	parser, match := getMatchingParser(line, lineParsers)
 	if parser != nil {
 		if parser.applyFunc == nil {
 			fmt.Println("ERROR: LineParser has no applyFunc!")
 		} else {
-      somethingHappened = true
+			somethingHappened = true
 			parser.applyFunc(&LineParserApplyArgs{
 				gs,
 				line,
@@ -126,8 +126,8 @@ func applyTagChange(args *LineParserApplyArgs) {
 		card.Damage = tag_value
 	case "EXHAUSTED":
 		card.Exhausted = tag_value == 1
-  case "FROZEN":
-    card.Frozen = tag_value == 1
+	case "FROZEN":
+		card.Frozen = tag_value == 1
 	case "HEALTH":
 		card.Health = tag_value
 	case "TAUNT":

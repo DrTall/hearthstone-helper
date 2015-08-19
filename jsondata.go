@@ -22,24 +22,25 @@ type JsonCardData struct {
 
 func newCardFromJson(jsonCardId string, instanceId int32) Card {
 	if jsonCard, ok := GlobalCardJsonData[jsonCardId]; ok {
-    result := Card{
+		result := Card{
 			InstanceId: instanceId,
 			JsonCardId: jsonCardId,
+			Type:       jsonCard.Type,
 			Name:       jsonCard.Name,
 			Cost:       jsonCard.Cost,
 			Attack:     jsonCard.Attack,
 			Health:     jsonCard.Health,
 			Exhausted:  true,
 		}
-    for _, mechanic := range jsonCard.Mechanics {
-      switch mechanic {
-        case "Taunt":
-          result.Taunt = true
-        default:
-          fmt.Printf("WARN: Unknown json card mechanic %v\n", mechanic)
-      }
-    }
-    return result
+		for _, mechanic := range jsonCard.Mechanics {
+			switch mechanic {
+			case "Taunt":
+				result.Taunt = true
+			default:
+				fmt.Printf("WARN: Unknown json card mechanic %v\n", mechanic)
+			}
+		}
+		return result
 	}
 	fmt.Printf("ERROR: Unknown jsonCardId: %v\n", jsonCardId)
 	return Card{
