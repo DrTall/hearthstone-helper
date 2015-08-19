@@ -37,7 +37,7 @@ func targetAnyMinion(card *Card) bool {
 // is played with optional target `targetCardId`  The action should modify `gs`
 // This applies only to spells & enchantments (TODO (dz): verify)
 var GlobalCardPlayedActions = map[string]func(gs *GameState, params *MoveParams){
-// TODO fill in
+	"EX1_607": func(gs *GameState, params *MoveParams) { params.CardOne.Attack += 2; gs.dealDamage(params.CardOne, 1) }, // Inner Rage
 }
 
 func getCardPlayedAction(card *Card) func(gs *GameState, params *MoveParams) {

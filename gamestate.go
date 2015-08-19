@@ -113,9 +113,13 @@ func (gs *GameState) useCard(params *MoveParams) {
 
 // Minion attack or weapon attack (modifies `gs` and the cards in it).
 func (gs *GameState) attack(params *MoveParams) {
-	params.CardOne.Damage += params.CardTwo.Attack
-	params.CardTwo.Damage += params.CardOne.Attack
+	gs.dealDamage(params.CardOne, params.CardTwo.Attack)
+	gs.dealDamage(params.CardTwo, params.CardOne.Attack)
 	gs.cleanupState()
+}
+
+func (gs *GameState) dealDamage(target *Card, amount int32) {
+	target.Damage += amount
 }
 
 // Clean up the gs state, moving cards to their zones, executing deathrattles, etc
