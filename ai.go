@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-// parameters that apply to all moves.  IdTwo is optional.  When it exists, it is the target (of an attack, spell, etc)
+// parameters that apply to all moves.  CardTwo is optional.  When it exists, it is the target (of an attack, spell, etc)
 type MoveParams struct {
-	IdOne       int32
-	IdTwo       int32
+	CardOne     *Card
+	CardTwo     *Card
 	Description string
 }
 
@@ -75,13 +75,13 @@ func getNextMoves(node *DecisionTreeNode) []Move {
 			// Attack minion
 			desc := fmt.Sprintf("%v attacking %v", friendlyMinion.Name, enemyMinion.Name)
 			result = append(result,
-				Move{nil, MoveParams{IdOne: friendlyMinion.InstanceId, IdTwo: enemyMinion.InstanceId, Description: desc}})
+				Move{nil, MoveParams{CardOne: friendlyMinion, CardTwo: enemyMinion, Description: desc}})
 		}
 		if !enemyTauntExists {
 			// Attack face
 			desc := fmt.Sprintf("%v attacking face (%v)", friendlyMinion.Name, enemyHero.Name)
 			result = append(result,
-				Move{nil, MoveParams{IdOne: friendlyMinion.InstanceId, IdTwo: enemyHero.InstanceId, Description: desc}})
+				Move{nil, MoveParams{CardOne: friendlyMinion, CardTwo: enemyHero, Description: desc}})
 		}
 	}
 
@@ -95,13 +95,13 @@ func getNextMoves(node *DecisionTreeNode) []Move {
 			}
 			desc := fmt.Sprintf("You (%v) attacking %v", friendlyHero.Name, enemyMinion.Name)
 			result = append(result,
-				Move{nil, MoveParams{IdOne: friendlyHero.InstanceId, IdTwo: enemyMinion.InstanceId, Description: desc}})
+				Move{nil, MoveParams{CardOne: friendlyHero, CardTwo: enemyMinion, Description: desc}})
 		}
 		if !enemyTauntExists {
 			// Attack face
 			desc := fmt.Sprintf("You (%v) attacking face (%v)", friendlyHero.Name, enemyHero.Name)
 			result = append(result,
-				Move{nil, MoveParams{IdOne: friendlyHero.InstanceId, IdTwo: enemyHero.InstanceId, Description: desc}})
+				Move{nil, MoveParams{CardOne: friendlyHero, CardTwo: enemyHero, Description: desc}})
 		}
 	}
 
@@ -124,7 +124,7 @@ func getNextMoves(node *DecisionTreeNode) []Move {
 		filter := getPlayCardTargetFilter(cardInHand)
 		if filter(nil) {
 			result = append(result,
-				Move{nil, MoveParams{IdOne: cardInHand.InstanceId, IdTwo: 0, Description: descPrefix}})
+				Move{nil, MoveParams{CardOne: cardInHand, CardTwo: nil, Description: descPrefix}})
 		} else {
 			couldTargetAny := false
 			for _, target := range node.Gs.CardsById {
@@ -132,14 +132,14 @@ func getNextMoves(node *DecisionTreeNode) []Move {
 					couldTargetAny = true
 					desc := fmt.Sprintf("%v on %v", descPrefix, target.Name)
 					result = append(result,
-						Move{nil, MoveParams{IdOne: cardInHand.InstanceId, IdTwo: 0, Description: desc}})
+						Move{nil, MoveParams{CardOne: cardInHand, CardTwo: nil, Description: desc}})
 				}
 			}
 			if !couldTargetAny {
 				if cardInHand.Type == "Minion" {
 					fmt.Printf("DEBUG: Allowing %v to be played without a target since none exist.\n", cardInHand.Name)
 					result = append(result,
-						Move{nil, MoveParams{IdOne: cardInHand.InstanceId, IdTwo: 0, Description: descPrefix}})
+						Move{nil, MoveParams{CardOne: cardInHand, CardTwo: nil, Description: descPrefix}})
 				} else {
 					fmt.Printf("DEBUG: No valid targets for %v.\n", cardInHand.Name)
 				}

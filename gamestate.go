@@ -86,13 +86,11 @@ func (gs *GameState) moveCard(card *Card, newZone string) {
 
 // use a card: either playing from hand, or using hero power
 func (gs *GameState) useCard(params *MoveParams) {
-	playCardId := params.IdOne
-	playCard := gs.CardsById[playCardId]
-	playCardData := GlobalCardJsonData[playCard.JsonCardId]
+	playCard := params.CardOne
 	switch playCard.Zone {
 	// If played from hand
 	case "FRIENDLY HAND":
-		switch playCardData.Type {
+		switch playCard.Type {
 		case "Minion":
 			// play minion
 			gs.moveCard(playCard, "FRIENDLY PLAY")
@@ -132,13 +130,8 @@ func (gs *GameState) useCard(params *MoveParams) {
 
 // Minion attack or weapon attack (modifies `gs` and the cards in it).
 func (gs *GameState) attack(params *MoveParams) {
-	cardOneId := params.IdOne
-	cardTwoId := params.IdTwo
-	// update their damage accordingly
-	cardOne := gs.CardsById[cardOneId]
-	cardTwo := gs.CardsById[cardTwoId]
-	cardOne.Damage = cardOne.Damage + cardTwo.Attack
-	cardTwo.Damage = cardTwo.Damage + cardOne.Attack
+	params.CardOne.Damage += params.CardTwo.Attack
+	params.CardTwo.Damage += params.CardOne.Attack
 	gs.cleanupState()
 }
 
