@@ -9,6 +9,20 @@ type GameState struct {
 	LastManaAdjustPlayer string
 }
 
+// Can't just use deepcopy.Copy because of CardsByZone's pointer keys.
+func (gs *GameState) DeepCopy() (*GameState) {
+  result := GameState{}
+  result.resetGameState()
+  for id, cardPtr := range gs.CardsById {
+    cardCopy := *cardPtr
+    result.CardsById[id] = &cardCopy
+    result.moveCard(&cardCopy, cardCopy.Zone) // Populate CardsByZone
+  }
+  result.Mana = gs.Mana
+  result.LastManaAdjustPlayer = gs.LastManaAdjustPlayer
+  return &result
+}
+
 func (gs *GameState) resetGameState() {
 	gs.CardsById = make(map[int32]*Card)
 	gs.CardsByZone = make(map[string]map[*Card]interface{})

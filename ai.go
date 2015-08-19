@@ -15,7 +15,7 @@ type MoveParams struct {
 }
 
 type Move struct {
-	ApplyMove func(gs *GameState, params *MoveParams) *GameState // Returns a copy of the gamestate
+	ApplyMove func(gs *GameState, params *MoveParams) // DeepCopy before calling.
 	params    MoveParams
 }
 
