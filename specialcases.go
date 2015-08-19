@@ -30,3 +30,17 @@ func targetEnemyMinion(card *Card) bool {
 func targetAnyMinion(card *Card) bool {
 	return card != nil && card.Type == "Minion" && strings.Contains(card.Zone, "PLAY")
 }
+
+////////////////////
+
+// All functions that we care about/ know about for when a card (key of the map is JsonId)
+// is played with optional target `targetCardId`  The action should modify `gs`
+// This applies only to spells & enchantments (TODO (dz): verify)
+var GlobalCardPlayedActions = map[string]func(gs *GameState, params *MoveParams){
+// TODO fill in
+}
+
+// All deathrattle actions we care about.  The action should modify `gs`
+var GlobalDeathrattleActions = map[string]func(gs *GameState, params *MoveParams){
+// TODO fill in
+}

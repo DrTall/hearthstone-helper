@@ -4,23 +4,6 @@ package main
 
 import "fmt"
 
-// All functions that we care about/ know about for when a card (key of the map is JsonId)
-// is played with optional target `targetCardId`  The action should modify `gs`
-// This applies only to spells & enchantments (TODO (dz): verify)
-var GlobalCardPlayedActions = map[string]func(gs *GameState, targetCardId int32){
-// TODO fill in
-}
-
-// All deathrattle actions we care about.  The action should modify `gs`
-var GlobalDeathrattleActions = map[string]func(gs *GameState, targetCardId int32){
-// TODO fill in
-}
-
-// All battelcry actions we care about.  The action should modify `gs`
-var GlobalBattlecryActions = map[string]func(gs *GameState, targetCardId int32){
-// TODO fill in
-}
-
 type GameState struct {
 	CardsById            map[int32]*Card
 	CardsByZone          map[string]map[*Card]interface{}
