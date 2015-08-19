@@ -45,8 +45,8 @@ func TestMove(t *testing.T) {
 
 	// create a move to test
 	moveParam := MoveParams{
-		IdOne:       c.InstanceId,
-		IdTwo:       0,
+		CardOne:     c,
+		CardTwo:     nil,
 		Description: "test move",
 	}
 	gs.useCard(&moveParam)
