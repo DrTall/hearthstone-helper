@@ -10,10 +10,10 @@ import "strings"
 // ALWAYS played without a target. It is up to the caller to note that
 // minions requiring targets can be played without a target when none exists.
 func getPlayCardTargetFilter(card *Card) func(*Card) bool {
-  if filter, ok := specialCardTargetFilters[card.JsonCardId]; ok {
-    return filter
-  }
-  return func(target *Card) bool { return true }
+	if filter, ok := specialCardTargetFilters[card.JsonCardId]; ok {
+		return filter
+	}
+	return func(target *Card) bool { return true }
 }
 
 var specialCardTargetFilters = map[string]func(*Card) bool{
