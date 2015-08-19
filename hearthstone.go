@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"time"
 )
 
 type LineParser struct {
@@ -65,7 +66,7 @@ func applyNewGame(args *LineParserApplyArgs) {
 }
 
 func applyCreatePlayer(args *LineParserApplyArgs) {
-	applyDebugWriteLine(args)
+	//applyDebugWriteLine(args)
 }
 
 func applyZoneChange(args *LineParserApplyArgs) {
@@ -79,7 +80,7 @@ func applyZoneChange(args *LineParserApplyArgs) {
 func applyTagChange(args *LineParserApplyArgs) {
 	applyDebugWriteLine(args)
 	instance_id, _ := strconv.ParseInt(args.match["instance_id"], 10, 32)
-	card := args.gs.getOrCreateCard("SHOULD_NOT_HAPPEN", int32(instance_id))
+	card := args.gs.getOrCreateCard(args.match["class_id"], int32(instance_id))
 	//ATK|COST|DAMAGE|EXHAUSTED|FROZEN|HEALTH|TAUNT|SILENCED
 	tag_value_str, _ := strconv.ParseInt(args.match["tag_value"], 10, 32)
 	tag_value := int32(tag_value_str)
@@ -98,8 +99,22 @@ func applyTagChange(args *LineParserApplyArgs) {
 		card.Taunt = tag_value == 1
 	case "SILENCED":
 		card.Silenced = tag_value == 1
+	default:
+		fmt.Println("ERROR: Unknown tag_name:", args.match["tag_name"])
 	}
 	prettyPrint(*card)
+}
+
+func applyTagChangeNoJsonId(args *LineParserApplyArgs) {
+	instance_id, _ := strconv.ParseInt(args.match["instance_id"], 10, 32)
+	if _, ok := args.gs.CardsById[int32(instance_id)]; ok {
+		// This card already exists so we will succeed in finding it without
+		// the json id.
+		applyTagChange(args)
+	} else {
+		fmt.Println("ERROR: Got a tag change for instance_id before "+
+			"it was given a json class:", instance_id)
+	}
 }
 
 func applyManaUpdate(args *LineParserApplyArgs) {
@@ -117,10 +132,10 @@ type GameState struct {
 }
 
 type Move struct {
-	ApplyMove func(gs *GameState) *GameState // Returns a copy
-  IdOne int32
-  IdTwo int32
-  Description string
+	ApplyMove   func(gs *GameState) *GameState // Returns a copy
+	IdOne       int32
+	IdTwo       int32
+	Description string
 }
 
 type DecisionTreeNode struct {
@@ -129,21 +144,25 @@ type DecisionTreeNode struct {
 	SuccessProbability float32
 }
 
-func WalkDecisionTree(workChan chan DecisionTreeNode, successChan chan DecisionTreeNode, timeoutChan chan bool) {
+func getNextMoves(node DecisionTreeNode) []Move {
+	return nil
+}
+
+func WalkDecisionTree(successChan <-chan *DecisionTreeNode, abortChan <-chan time.Time) {
+	fmt.Println("DEBUG: Beginning decision tree walk.")
+	workChan := make(chan DecisionTreeNode)
+	timeoutChan := time.After(time.Second * 70)
 	for {
 		select {
+		case <-abortChan:
+			fmt.Println("DEBUG: Decision tree walk aborting...")
+			return
 		case <-timeoutChan:
-			// Shut down after draining the workChan.
-			for {
-				select {
-				case <-workChan:
-				default:
-					return
-				}
-			}
+			fmt.Println("DEBUG: Decision tree walk timing out...")
+			return
 		case node := <-workChan:
 			go func() {
-				nextMoves := getNextMoves()
+				nextMoves := getNextMoves(node) // Does not modify node.
 				for _, move := range nextMoves {
 					move = move // Long story.
 					go func() {
@@ -235,6 +254,7 @@ type Card struct {
 	Cost       int32
 	Attack     int32
 	Health     int32
+	Armor      int32
 	Damage     int32
 	Exhausted  bool
 	Frozen     bool
@@ -256,6 +276,7 @@ func newCardFromJson(jsonCardId string, instanceId int32) Card {
 		}
 	}
 	fmt.Printf("ERROR: Unknown jsonCardId: %v\n", jsonCardId)
+	panic("ohy noes")
 	return Card{
 		InstanceId: instanceId,
 		JsonCardId: jsonCardId,
@@ -315,19 +336,16 @@ func main() {
 	flag.Parse()
 
 	log, _ := tail.TailFile(*hsLogFile, tail.Config{Follow: true})
-	startOfTurnString := `[Power] GameState.DebugPrintPower() - TAG_CHANGE Entity=GameEntity tag=STEP value=MAIN_ACTION`
+	startTurnPattern := regexp.MustCompile(`Entity=GameEntity tag=STEP value=MAIN_ACTION`)
 	lineParsers := []LineParser{
 		LineParser{applyManaUpdate, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
 			`TAG_CHANGE Entity=(?P<name>.*) tag=RESOURCES value=(?P<mana>\d+)`)},
 		LineParser{applyNewGame, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
 			`CREATE_GAME`)},
-		LineParser{applyDebugWriteLine, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
-			`TAG_CHANGE Entity=(?P<player_name>.*) tag=PLAYER_ID value=(?P<player_id>.*)`)},
-		LineParser{applyDebugWriteLine, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
-			`TAG_CHANGE Entity=(?P<player_name>.*) tag=PLAYER_ID value=(?P<player_id>.*)`)},
-
 		LineParser{applyTagChange, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
-			`TAG_CHANGE .*id=(?P<instance_id>\d+).* tag=(?P<tag_name>ATK|COST|DAMAGE|EXHAUSTED|FROZEN|HEALTH|TAUNT|SILENCED) value=(?P<tag_value>.*)`)},
+			`TAG_CHANGE .*id=(?P<instance_id>\d+).*cardId=(?P<class_id>\S+).*tag=(?P<tag_name>ATK|ARMOR|COST|DAMAGE|FROZEN|HEALTH|TAUNT|SILENCED) value=(?P<tag_value>.*)`)},
+		LineParser{applyTagChangeNoJsonId, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
+			`TAG_CHANGE .*id=(?P<instance_id>\d+).*tag=(?P<tag_name>ATK|ARMOR|COST|DAMAGE|FROZEN|HEALTH|TAUNT|SILENCED) value=(?P<tag_value>.*)`)},
 		//LineParser{applyDebugWriteLine, regexp.MustCompile(`\[Zone\] ZoneChangeList.ProcessChanges\(\) -\s+` +
 		//	`id=.* local=.* \[name=(?P<name>.*) id=(?P<instanceId>.*) zone=.* zonePos=.* cardId=(?P<class_id>.*) player=(?P<player_id>.*)\] zone from (?P<zome_from>.*) -> (?P<zome_to>.*)`)},
 		LineParser{applyZoneChange, regexp.MustCompile(`\[Zone\] ZoneChangeList.ProcessChanges\(\) -\s+` +
@@ -337,24 +355,37 @@ func main() {
 
 	gs := GameState{}
 	gs.resetGameState()
-	for line := range log.Lines {
-		if line.Text == startOfTurnString {
-			// Call WalkDecisionTree
-			fmt.Println("It is the start of turn for:", gs.LastManaAdjustPlayer)
-		} else {
-			// Need to abort ongoing decision tree search.
-			parser, match := getMatchingParser(line.Text, lineParsers)
-			if parser != nil {
-				if parser.applyFunc == nil {
-					fmt.Println("ERROR: LineParser has no applyFunc!")
-				} else {
-					parser.applyFunc(&LineParserApplyArgs{
-						&gs,
-						line.Text,
-						match,
-					})
+	var abortChan *chan time.Time
+	successChan := make(chan *DecisionTreeNode)
+	for {
+		select {
+		case line := <-log.Lines:
+			if match := startTurnPattern.FindStringSubmatch(line.Text); len(match) > 0 && abortChan == nil {
+				fmt.Println("It is the start of turn for:", gs.LastManaAdjustPlayer)
+				newAbortChan := make(chan time.Time, 1)
+				abortChan = &newAbortChan
+				go WalkDecisionTree(successChan, newAbortChan)
+			} else {
+				parser, match := getMatchingParser(line.Text, lineParsers)
+				if parser != nil {
+					if parser.applyFunc == nil {
+						fmt.Println("ERROR: LineParser has no applyFunc!")
+					} else {
+						if abortChan != nil {
+							*abortChan <- time.Now()
+							abortChan = nil
+						}
+						parser.applyFunc(&LineParserApplyArgs{
+							&gs,
+							line.Text,
+							match,
+						})
+					}
 				}
 			}
+		case solution := <-successChan:
+			fmt.Println("DEBUG: Found a solution!")
+			prettyPrint(*solution)
 		}
 	}
 }
