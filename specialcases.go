@@ -35,9 +35,29 @@ func targetAnyMinion(card *Card) bool {
 
 // All functions that we care about/ know about for when a card (key of the map is JsonId)
 // is played with optional target `targetCardId`  The action should modify `gs`
-// This applies only to spells & enchantments (TODO (dz): verify)
+// It is up to the caller to call gs.cleanupState afterwards.
 var GlobalCardPlayedActions = map[string]func(gs *GameState, params *MoveParams){
+	// "EX1_392": // Battle Rage -- TODO how do we handle card draw?
+	"EX1_603": func(gs *GameState, params *MoveParams) {
+		if params.CardTwo != nil {
+			params.CardTwo.Attack += 2
+			gs.dealDamage(params.CardTwo, 1)
+		}
+	}, // Cruel Taskmaster
+	"CS2_108": func(gs *GameState, params *MoveParams) { params.CardOne.PendingDestroy = true }, // Execute
+	// "CS2_147": // Gnomish Inventor -- TODO how do we handle card draw?
 	"EX1_607": func(gs *GameState, params *MoveParams) { params.CardOne.Attack += 2; gs.dealDamage(params.CardOne, 1) }, // Inner Rage
+	"EX1_391": func(gs *GameState, params *MoveParams) { gs.dealDamage(params.CardOne, 2) },                             // Slam -- TODO how do we handle card draw?
+	"EX1_400": whirlwindAction,                                                                                          // Whirlwind
+}
+
+func whirlwindAction(gs *GameState, _ *MoveParams) {
+	for minion := range gs.CardsByZone["FRIENDLY PLAY"] {
+		gs.dealDamage(minion, 1)
+	}
+	for minion := range gs.CardsByZone["OPPOSING PLAY"] {
+		gs.dealDamage(minion, 1)
+	}
 }
 
 func getCardPlayedAction(card *Card) func(gs *GameState, params *MoveParams) {

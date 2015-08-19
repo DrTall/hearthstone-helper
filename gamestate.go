@@ -129,18 +129,19 @@ func (gs *GameState) cleanupState() {
 
 // A particular instance of a card in the game.
 type Card struct {
-	InstanceId int32  // Globally unique.
-	JsonCardId string // Refers to JsonCardData.Id
-	Type       string // Refers to JsonCardData.Type
-	Name       string // Refers to JsonCardData.Name
-	Cost       int32
-	Attack     int32
-	Health     int32
-	Armor      int32
-	Damage     int32
-	Exhausted  bool
-	Frozen     bool
-	Taunt      bool
-	Silenced   bool
-	Zone       string
+	InstanceId     int32  // Globally unique.
+	JsonCardId     string // Refers to JsonCardData.Id
+	Type           string // Refers to JsonCardData.Type
+	Name           string // Refers to JsonCardData.Name
+	Cost           int32
+	Attack         int32
+	Health         int32
+	Armor          int32
+	Damage         int32
+	Exhausted      bool
+	Frozen         bool
+	Taunt          bool
+	Silenced       bool
+	Zone           string
+	PendingDestroy bool // Internal. Should this minion be destroyed in the next cleanup step?
 }
