@@ -140,23 +140,15 @@ func useCard(gs *GameState, params *MoveParams) {
 // Run the action out of GlobalCardPlayedActions for a given move.
 func runCardPlayedAction(gs *GameState, params *MoveParams) {
 	// fmt.Println("DEBUG: running action for move: ", params)
-	runActionForCard(GlobalCardPlayedActions, gs, params)
+  getCardPlayedAction(params.CardOne)(gs, params)
 }
 
 // Run the action out of GlobalDeathrattleActions for a given card.
 func runDeathrattleAction(gs *GameState, dyingMinion *Card) {
-	dummyMoveParams := MoveParams{
-		CardOne:     dyingMinion,
-		Description: "Dummy move param for deathrattle",
-	}
-	runActionForCard(GlobalDeathrattleActions, gs, &dummyMoveParams)
-}
-
-func runActionForCard(ActionsMap map[string]func(gs *GameState, params *MoveParams), gs *GameState, params *MoveParams) {
-	playCard := params.CardOne
-	if functionToExecute, ok := ActionsMap[playCard.JsonCardId]; ok {
-		functionToExecute(gs, params)
-	}
+  getDeathrattleAction(dyingMinion)(gs, &MoveParams{
+    CardOne:     dyingMinion,
+    Description: "Dummy move param for deathrattle",
+  })
 }
 
 func (gs *GameState) CreateNewMinion(jsonId string, zone string) {

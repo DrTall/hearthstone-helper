@@ -161,7 +161,7 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 				if filter(target) {
 					couldTargetAny = true
 					desc := fmt.Sprintf("%v on %v", descPrefix, target.Name)
-					workChan <- generateNode(node, &Move{useCard, MoveParams{CardOne: cardInHand, CardTwo: nil, Description: desc}})
+					workChan <- generateNode(node, &Move{useCard, MoveParams{CardOne: cardInHand, CardTwo: target, Description: desc}})
 				}
 			}
 			if !couldTargetAny {
