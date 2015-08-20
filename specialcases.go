@@ -3,7 +3,6 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -15,6 +14,12 @@ import (
 func getPlayCardTargetFilter(card *Card) func(*Card) bool {
 	if filter, ok := specialCardTargetFilters[card.JsonCardId]; ok {
 		return filter
+	}
+	// Do we even know how to play this spell?
+	if card.Type == "Spell" {
+		if _, ok := GlobalCardPlayedActions[card.JsonCardId]; !ok {
+			return func(target *Card) bool { return false }
+		}
 	}
 	return func(target *Card) bool { return true }
 }
@@ -55,7 +60,7 @@ var GlobalCardPlayedActions = map[string]func(gs *GameState, params *MoveParams)
 }
 
 func taskmasterAction(gs *GameState, params *MoveParams) {
-	fmt.Println("DEBUG: taskmasterAction with target: ", params.CardTwo)
+	//fmt.Println("DEBUG: taskmasterAction with target: ", params.CardTwo)
 	if params.CardTwo != nil {
 		params.CardTwo.Attack += 2
 		gs.dealDamage(params.CardTwo, 1)

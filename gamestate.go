@@ -93,18 +93,18 @@ func useCard(gs *GameState, params *MoveParams) {
 		gs.Mana -= playCard.Cost
 		switch playCard.Type {
 		case "Minion":
-			// minion comes into play
-			gs.moveCard(playCard, "FRIENDLY PLAY")
 			// Warsong Commander
 			if playCard.Attack <= 3 {
 				for friendlyMinion := range gs.CardsByZone["FRIENDLY PLAY"] {
 					if friendlyMinion.JsonCardId == "EX1_084" && !friendlyMinion.Silenced {
 						//fmt.Println("DEBUG: Getting charge from Warsong Commander.")
 						playCard.Charge = true
-						playCard.Exhausted = false
 					}
 				}
 			}
+			// minion comes into play
+			gs.moveCard(playCard, "FRIENDLY PLAY")
+			playCard.Exhausted = !playCard.Charge
 			// battlecry effects, if any
 			runCardPlayedAction(gs, params)
 		case "Spell":
@@ -118,16 +118,18 @@ func useCard(gs *GameState, params *MoveParams) {
 			playCard.Exhausted = true
 		case "Weapon":
 			// remove anything currently in weapon zone
-			if weapons, exists := gs.CardsByZone["FRIENDLY PLAY (Weapon)"]; exists {
-				if len(weapons) > 1 {
-					fmt.Println("more than one weapon in play??", weapons)
-				}
-				for oldWeapon, _ := range weapons {
-					gs.moveCard(oldWeapon, "FRIENDLY GRAVEYARD")
-				}
+			friendlyHero := getSingletonFromZone(gs, "FRIENDLY PLAY (Hero)", true)
+			prettyPrint(friendlyHero)
+			if oldWeapon := getSingletonFromZone(gs, "FRIENDLY PLAY (Weapon)", false); oldWeapon != nil {
+				// Yes, really destroy the weapon now: http://hearthstone.gamepedia.com/Advanced_rulebook#Instant_weapon_destruction
+				gs.handleDeath(oldWeapon)
+				friendlyHero.Attack -= oldWeapon.Attack
 			}
 			// new weapon to weapon zone
 			gs.moveCard(playCard, "FRIENDLY PLAY (Weapon)")
+			friendlyHero.Attack += playCard.Attack
+			// Assert we now have exactly one weapon.
+			getSingletonFromZone(gs, "FRIENDLY PLAY (Weapon)", true)
 			// TODO (dz): other card types (Enchantment?)
 		}
 	// If on battlefield, then this is a minion attack.
@@ -162,6 +164,7 @@ func runDeathrattleAction(gs *GameState, dyingMinion *Card) {
 
 func (gs *GameState) CreateNewMinion(jsonId string, zone string) {
 	card := gs.getOrCreateCard(jsonId, gs.HighestCardId+1)
+	card.Exhausted = true
 	gs.moveCard(card, zone)
 }
 
@@ -204,8 +207,8 @@ func minionNeedsKilling(card *Card) bool {
 func (gs *GameState) cleanupState() {
 	// check for PendingDestroy or lethal damage on minions
 	didAnything := false
-	friendlyHero := getSingletonFromZone("FRIENDLY PLAY (Hero)", gs)
-	enemyHero := getSingletonFromZone("OPPOSING PLAY (Hero)", gs)
+	friendlyHero := getSingletonFromZone(gs, "FRIENDLY PLAY (Hero)", true)
+	enemyHero := getSingletonFromZone(gs, "OPPOSING PLAY (Hero)", true)
 	if minionNeedsKilling(friendlyHero) {
 		//fmt.Println("DEBUG: Oops, we died.")
 		gs.Winner = OPPOSING_VICTORY_OR_DRAW

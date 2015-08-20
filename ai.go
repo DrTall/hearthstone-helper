@@ -21,17 +21,17 @@ type DecisionTreeNode struct {
 }
 
 // Hack around the fact that you have to iterate to get a map key.
-func getSingletonFromZone(zone string, gs *GameState) (result *Card) {
+func getSingletonFromZone(gs *GameState, zone string, mustExist bool) (result *Card) {
 	numFound := 0
 	for card := range gs.CardsByZone[zone] {
 		numFound += 1
 		if numFound > 1 {
-			fmt.Println("ERROR: Multiple cards found in singleton zone!", zone)
+			panic(fmt.Sprintf("ERROR: Multiple cards found in singleton zone: %v", zone))
 		}
 		result = card
 	}
-	if numFound == 0 {
-		fmt.Println("ERROR: Zero cards found in singleton zone!", zone)
+	if numFound == 0 && mustExist {
+		panic(fmt.Sprintf("ERROR: Zero cards found in singleton zone: %v", zone))
 	}
 	return
 }
@@ -74,8 +74,8 @@ func generateNode(node *DecisionTreeNode, move *MoveParams) *DecisionTreeNode {
 //  Hero power (this is not due to complexity but mostly because it probably won't help us win).
 func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode) {
 	// Pre-compute some useful stuff.
-	friendlyHero := getSingletonFromZone("FRIENDLY PLAY (Hero)", node.Gs)
-	enemyHero := getSingletonFromZone("OPPOSING PLAY (Hero)", node.Gs)
+	friendlyHero := getSingletonFromZone(node.Gs, "FRIENDLY PLAY (Hero)", true)
+	enemyHero := getSingletonFromZone(node.Gs, "OPPOSING PLAY (Hero)", true)
 	enemyTauntExists := false
 	for enemyMinion := range node.Gs.CardsByZone["OPPOSING PLAY"] {
 		if enemyMinion.Taunt {
@@ -98,12 +98,12 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 				continue
 			}
 			// Attack minion
-			desc := fmt.Sprintf("%v attacking %v", friendlyMinion.Name, enemyMinion.Name)
+			desc := fmt.Sprintf("%v attacks %v", friendlyMinion.Name, enemyMinion.Name)
 			workChan <- generateNode(node, &MoveParams{CardOne: friendlyMinion, CardTwo: enemyMinion, Description: desc})
 		}
 		if !enemyTauntExists {
 			// Attack face
-			desc := fmt.Sprintf("%v attacking face (%v)", friendlyMinion.Name, enemyHero.Name)
+			desc := fmt.Sprintf("%v attacks face (%v)", friendlyMinion.Name, enemyHero.Name)
 			workChan <- generateNode(node, &MoveParams{CardOne: friendlyMinion, CardTwo: enemyHero, Description: desc})
 		}
 	}
@@ -116,12 +116,12 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 				//fmt.Printf("DEBUG: %v is protected by a taunt minion.\n", enemyMinion.Name)
 				continue
 			}
-			desc := fmt.Sprintf("You (%v) attacking %v", friendlyHero.Name, enemyMinion.Name)
+			desc := fmt.Sprintf("You (%v) attack %v", friendlyHero.Name, enemyMinion.Name)
 			workChan <- generateNode(node, &MoveParams{CardOne: friendlyHero, CardTwo: enemyMinion, Description: desc})
 		}
 		if !enemyTauntExists {
 			// Attack face
-			desc := fmt.Sprintf("You (%v) attacking face (%v)", friendlyHero.Name, enemyHero.Name)
+			desc := fmt.Sprintf("You (%v) attack face (%v)", friendlyHero.Name, enemyHero.Name)
 			workChan <- generateNode(node, &MoveParams{CardOne: friendlyHero, CardTwo: enemyHero, Description: desc})
 		}
 	}
@@ -171,10 +171,11 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 	}
 }
 
-func WalkDecisionTree(gs *GameState, successChan chan<- *DecisionTreeNode, abortChan <-chan time.Time) {
+func WalkDecisionTree(gs *GameState, solutionChan chan<- *DecisionTreeNode, abortChan <-chan time.Time) {
 	fmt.Println("DEBUG: Beginning decision tree walk.")
 	workChan := make(chan *DecisionTreeNode, 1000)
-	timeoutChan := time.After(time.Second * 700000)
+	softTimeoutChan := time.After(time.Second * 70)
+	timeoutChan := time.After(time.Second * 300)
 
 	// Sleep briefly before kicking off the work, since it will get cancelled
 	// very quickly in turns where the human operator knows there's no hope.
@@ -187,13 +188,11 @@ func WalkDecisionTree(gs *GameState, successChan chan<- *DecisionTreeNode, abort
 		}
 	}()
 	var totalNodes, maxDepth int
-	var deepestNode, deepestSolution *DecisionTreeNode
+	var deepestNode *DecisionTreeNode
 	defer func() {
 		fmt.Printf("INFO: WalkDecisionTree exited after considering %v nodes with maxDepth %v.\n", totalNodes, maxDepth)
 		fmt.Println("Deepest node discovered:")
 		prettyPrintDecisionTreeNode(deepestNode)
-		fmt.Println("Deepest solution discovered:")
-		prettyPrintDecisionTreeNode(deepestSolution)
 	}()
 	for {
 		select {
@@ -203,8 +202,13 @@ func WalkDecisionTree(gs *GameState, successChan chan<- *DecisionTreeNode, abort
 		case <-timeoutChan:
 			fmt.Println("DEBUG: Decision tree walk timing out...")
 			return
+		case <-softTimeoutChan:
+			fmt.Println("WARN: It's been 70 seconds now.")
 		case node := <-workChan:
 			totalNodes += 1
+			if totalNodes%100000 == 0 {
+				fmt.Printf("DEBUG: Seen %v nodes so far.\n", totalNodes)
+			}
 			depth := len(node.Moves)
 			if depth > maxDepth {
 				fmt.Printf("DEBUG: New depth reached: %v. Seen %v nodes so far.\n", depth, totalNodes)
@@ -222,10 +226,7 @@ func WalkDecisionTree(gs *GameState, successChan chan<- *DecisionTreeNode, abort
 			}*/
 			switch node.Gs.Winner {
 			case FRIENDLY_VICTORY:
-				if deepestSolution == nil || len(deepestSolution.Moves) < len(node.Moves) {
-					deepestSolution = node
-				}
-				successChan <- node
+				solutionChan <- node
 			case NO_VICTORY:
 				go generateNextNodes(node, workChan)
 			case OPPOSING_VICTORY_OR_DRAW:
@@ -233,9 +234,8 @@ func WalkDecisionTree(gs *GameState, successChan chan<- *DecisionTreeNode, abort
 			default:
 				panic("Unknown Winner state")
 			}
-			//return
 		case <-time.After(5 * time.Second):
-			fmt.Println("INFO: Analysis complete. You cannot win this turn.")
+			fmt.Println("INFO: Analysis complete.")
 			return
 		}
 	}

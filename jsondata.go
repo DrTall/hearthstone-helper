@@ -30,7 +30,6 @@ func newCardFromJson(jsonCardId string, instanceId int32) Card {
 			Cost:       jsonCard.Cost,
 			Attack:     jsonCard.Attack,
 			Health:     jsonCard.Health,
-			Exhausted:  true,
 		}
 		for _, mechanic := range jsonCard.Mechanics {
 			switch mechanic {

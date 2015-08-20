@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -33,8 +32,9 @@ func main() {
 
 	gs := GameState{}
 	gs.resetGameState()
+	solutionChan := make(chan *DecisionTreeNode)
+	var deepestSolution, shortestSolution *DecisionTreeNode
 	var abortChan *chan time.Time
-	successChan := make(chan *DecisionTreeNode)
 	for {
 		select {
 		case line := <-log.Lines:
@@ -42,17 +42,30 @@ func main() {
 				fmt.Println("It is the start of turn for:", gs.LastManaAdjustPlayer)
 				newAbortChan := make(chan time.Time, 1)
 				abortChan = &newAbortChan
-				go WalkDecisionTree(gs.DeepCopy(), successChan, newAbortChan)
+				go WalkDecisionTree(gs.DeepCopy(), solutionChan, newAbortChan)
 			} else if somethingHappened && abortChan != nil {
 				*abortChan <- time.Now()
 				abortChan = nil
+				deepestSolution = nil
+				shortestSolution = nil
 			}
-		case solution := <-successChan:
-			var buffer bytes.Buffer
-			for _, move := range solution.Moves {
-				buffer.WriteString(move.Description + "\n")
+		case solution := <-solutionChan:
+			if deepestSolution == nil {
+				deepestSolution = solution
+				shortestSolution = solution
+				fmt.Println("INFO: Solution found")
+				prettyPrintDecisionTreeNode(solution)
 			}
-			fmt.Println(buffer.String())
+			if len(deepestSolution.Moves) < len(solution.Moves) {
+				deepestSolution = solution
+				fmt.Println("INFO: Another solution with more BM:")
+				prettyPrintDecisionTreeNode(solution)
+			}
+			if len(shortestSolution.Moves) > len(solution.Moves) {
+				shortestSolution = solution
+				fmt.Println("INFO: Another solution with fewer steps:")
+				prettyPrintDecisionTreeNode(solution)
+			}
 		}
 	}
 }
