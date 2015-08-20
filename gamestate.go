@@ -9,6 +9,7 @@ type GameState struct {
 	CardsByZone          map[string]map[*Card]interface{}
 	Mana                 int32
 	LastManaAdjustPlayer string
+	HighestCardId        int32
 }
 
 // Can't just use deepcopy.Copy because of CardsByZone's pointer keys.
@@ -30,6 +31,7 @@ func (gs *GameState) resetGameState() {
 	gs.CardsByZone = make(map[string]map[*Card]interface{})
 	gs.Mana = 0
 	gs.LastManaAdjustPlayer = "NOBODY?!"
+	gs.HighestCardId = 0
 }
 
 func (gs *GameState) getOrCreateCard(jsonCardId string, instanceId int32) *Card {
@@ -38,6 +40,9 @@ func (gs *GameState) getOrCreateCard(jsonCardId string, instanceId int32) *Card 
 		return card
 	}
 	//fmt.Println("DEBUG: Creating new card for instance: ", instanceId)
+	if instanceId > gs.HighestCardId {
+		gs.HighestCardId = instanceId
+	}
 	result := newCardFromJson(jsonCardId, instanceId)
 	gs.CardsById[instanceId] = &result
 	return &result
@@ -53,11 +58,25 @@ func (gs *GameState) moveCard(card *Card, newZone string) {
 			delete(oldZoneCards, card)
 		}
 	}
+
+	// Warsong Commander
+	if newZone == "FRIENDLY PLAY" && card.Attack <= 3 {
+		for friendlyMinion := range gs.CardsByZone["FRIENDLY PLAY"] {
+			if friendlyMinion.JsonCardId == "EX1_084" && !friendlyMinion.Silenced {
+				fmt.Println("DEBUG: Getting charge from Warsong Commander.")
+				card.Charge = true
+				card.Exhausted = false
+				break
+			}
+		}
+	}
+
 	if _, ok := gs.CardsByZone[newZone]; !ok {
 		gs.CardsByZone[newZone] = make(map[*Card]interface{})
 	}
 	card.Zone = newZone
 	gs.CardsByZone[card.Zone][card] = nil
+
 	//fmt.Println("BEFORE HELLO!!!", gs)
 	//prettyPrint(gs)
 }
@@ -111,6 +130,11 @@ func (gs *GameState) useCard(params *MoveParams) {
 	}
 }
 
+func (gs *GameState) CreateNewMinion(jsonId string, zone string) {
+	card := gs.getOrCreateCard(jsonId, gs.HighestCardId+1)
+	gs.moveCard(card, zone)
+}
+
 // Minion attack or weapon attack (modifies `gs` and the cards in it).
 func (gs *GameState) attack(params *MoveParams) {
 	gs.dealDamage(params.CardOne, params.CardTwo.Attack)
@@ -120,6 +144,26 @@ func (gs *GameState) attack(params *MoveParams) {
 
 func (gs *GameState) dealDamage(target *Card, amount int32) {
 	target.Damage += amount
+
+	// We're not bad people, but we did a bad thing...
+	// TODO: Implement some kind of generic listener framework someday.
+	if target.JsonCardId == "BRM_019" && !target.Silenced &&
+		target.Damage < target.Health && len(gs.CardsByZone[target.Zone]) < 7 { // Grim Patron
+		fmt.Println("DEBUG: Everyone! Get in here!")
+		gs.CreateNewMinion(target.Zone, "BRM_019")
+	}
+	for friendlyMinion := range gs.CardsByZone["FRIENDLY PLAY"] {
+		if friendlyMinion.JsonCardId == "EX1_604" && !friendlyMinion.Silenced { // Frothing Berserker
+			fmt.Println("DEBUG: My blade be thirsty!")
+			friendlyMinion.Attack += 1
+		}
+	}
+	for enemyMinion := range gs.CardsByZone["OPPOSING PLAY"] {
+		if enemyMinion.JsonCardId == "EX1_604" && !enemyMinion.Silenced { // Frothing Berserker
+			fmt.Println("DEBUG: Enemy Frothing Berserker triggered.")
+			enemyMinion.Attack += 1
+		}
+	}
 }
 
 // Clean up the gs state, moving cards to their zones, executing deathrattles, etc
@@ -138,6 +182,7 @@ type Card struct {
 	Health         int32
 	Armor          int32
 	Damage         int32
+	Charge         bool
 	Exhausted      bool
 	Frozen         bool
 	Taunt          bool

@@ -100,6 +100,7 @@ func getNextMoves(node *DecisionTreeNode, resultChan chan<- *Move) {
 	}
 
 	// Spells, Minions, and Weapons can be played including targets maybe.
+	numFriendlyMinions := len(node.Gs.CardsByZone["FRIENDLY PLAY"])
 	for cardInHand := range node.Gs.CardsByZone["FRIENDLY HAND"] {
 		if cardInHand.Cost > node.Gs.Mana {
 			// Too expensive.
@@ -113,6 +114,10 @@ func getNextMoves(node *DecisionTreeNode, resultChan chan<- *Move) {
 		case "Weapon":
 			descPrefix = fmt.Sprintf("Equip %v", cardInHand.Name)
 		case "Minion":
+			if numFriendlyMinions >= 7 {
+				fmt.Printf("DEBUG: No space on the board to play %v.\n", cardInHand.Name)
+				continue
+			}
 			descPrefix = fmt.Sprintf("Play %v", cardInHand.Name)
 		}
 		filter := getPlayCardTargetFilter(cardInHand)
