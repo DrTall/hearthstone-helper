@@ -57,10 +57,44 @@ func TestMove(t *testing.T) {
 		t.Error()
 	}
 	// Card should now be in play
-	if hand, _ := gs.CardsByZone["FRIENDLY PLAY"]; len(hand) != 1 {
+	if cardsInPlay, _ := gs.CardsByZone["FRIENDLY PLAY"]; len(cardsInPlay) != 1 {
 		t.Error()
 	}
 	if c.Zone != "FRIENDLY PLAY" {
+		t.Error()
+	}
+}
+
+func TestBattlecry(t *testing.T) {
+	fmt.Println("---- TestBattlecry starting")
+	gs := GameState{}
+	gs.resetGameState()
+	c := gs.getOrCreateCard("EX1_603", 42)
+	murloc := gs.getOrCreateCard("EX1_506", 43)
+	gs.moveCard(c, "FRIENDLY HAND")
+	gs.moveCard(murloc, "FRIENDLY PLAY")
+
+	// create a move to test
+	moveParam := MoveParams{
+		CardOne:     c,
+		CardTwo:     murloc,
+		Description: "play CruelTaskmaster from hand, targeting Gnomish Inventor with battlecry",
+	}
+	gs.useCard(&moveParam)
+	fmt.Println(gs)
+
+	// Card should no longer be in hand
+	if hand, _ := gs.CardsByZone["FRIENDLY HAND"]; len(hand) != 0 {
+		t.Error("Cards in hand: ", len(hand))
+	}
+	// Card should now be in play, but the Gnomish Inventor should be dead.
+	if cardsInPlay, _ := gs.CardsByZone["FRIENDLY PLAY"]; len(cardsInPlay) != 1 {
+		t.Error("Cards in play: ", len(cardsInPlay))
+	}
+	if c.Zone != "FRIENDLY PLAY" {
+		t.Error()
+	}
+	if murloc.Zone != "FRIENDLY GRAVEYARD" {
 		t.Error()
 	}
 }

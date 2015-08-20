@@ -2,7 +2,10 @@
 
 package main
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // Returns a filter function which returns true/false for whether a given
 // card can be the target of this one when it is played.
@@ -47,6 +50,7 @@ var GlobalCardPlayedActions = map[string]func(gs *GameState, params *MoveParams)
 }
 
 func taskmasterAction(gs *GameState, params *MoveParams) {
+	fmt.Println("DEBUG: taskmasterAction with target: ", params.CardTwo)
 	if params.CardTwo != nil {
 		params.CardTwo.Attack += 2
 		gs.dealDamage(params.CardTwo, 1)

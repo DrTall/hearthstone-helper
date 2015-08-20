@@ -54,7 +54,6 @@ func (gs *GameState) getOrCreateCard(jsonCardId string, instanceId int32) *Card 
 func (gs *GameState) moveCard(card *Card, newZone string) {
 	if oldZoneCards, ok := gs.CardsByZone[card.Zone]; ok {
 		if _, ok := oldZoneCards[card]; ok {
-			//fmt.Println("DEBUG: removing card from old zone: ", card.Zone)
 			delete(oldZoneCards, card)
 		}
 	}
@@ -94,13 +93,19 @@ func (gs *GameState) useCard(params *MoveParams) {
 	case "FRIENDLY HAND":
 		switch playCard.Type {
 		case "Minion":
-			// play minion
+			// minion comes into play
 			gs.moveCard(playCard, "FRIENDLY PLAY")
-			// TODO (dz): execute battlecry
+			// battlecry effects, if any
+			runCardPlayedAction(gs, params)
 		case "Spell":
 			// execute spell
-			// TODO (dz): execute spell effect
+			runCardPlayedAction(gs, params)
 			gs.moveCard(playCard, "FRIENDLY GRAVEYARD")
+		case "FRIENDLY PLAY (Hero Power)":
+			// if using hero power
+			runCardPlayedAction(gs, params)
+			// hero power is now exhausted
+			playCard.Exhausted = true
 		case "Weapon":
 			// remove anything currently in weapon zone
 			if weapons, exists := gs.CardsByZone["FRIENDLY PLAY (Weapon)"]; exists {
@@ -124,9 +129,32 @@ func (gs *GameState) useCard(params *MoveParams) {
 	case "FRIENDLY PLAY (Hero)":
 		fmt.Println("`useCard` called with hero card, using `attack` instead.")
 		gs.attack(params)
-	// if using hero power
 	default:
 		fmt.Println("Unrecognized Zone to play a card from: ", playCard.Zone)
+		panic("Unrecognized Zone to play a card from!")
+	}
+	gs.cleanupState()
+}
+
+// Run the action out of GlobalCardPlayedActions for a given move.
+func runCardPlayedAction(gs *GameState, params *MoveParams) {
+	// fmt.Println("DEBUG: running action for move: ", params)
+	runActionForCard(GlobalCardPlayedActions, gs, params)
+}
+
+// Run the action out of GlobalDeathrattleActions for a given card.
+func runDeathrattleAction(gs *GameState, dyingMinion *Card) {
+	dummyMoveParams := MoveParams{
+		CardOne:     dyingMinion,
+		Description: "Dummy move param for deathrattle",
+	}
+	runActionForCard(GlobalDeathrattleActions, gs, &dummyMoveParams)
+}
+
+func runActionForCard(ActionsMap map[string]func(gs *GameState, params *MoveParams), gs *GameState, params *MoveParams) {
+	playCard := params.CardOne
+	if functionToExecute, ok := ActionsMap[playCard.JsonCardId]; ok {
+		functionToExecute(gs, params)
 	}
 }
 
@@ -139,7 +167,6 @@ func (gs *GameState) CreateNewMinion(jsonId string, zone string) {
 func (gs *GameState) attack(params *MoveParams) {
 	gs.dealDamage(params.CardOne, params.CardTwo.Attack)
 	gs.dealDamage(params.CardTwo, params.CardOne.Attack)
-	gs.cleanupState()
 }
 
 func (gs *GameState) dealDamage(target *Card, amount int32) {
@@ -168,7 +195,20 @@ func (gs *GameState) dealDamage(target *Card, amount int32) {
 
 // Clean up the gs state, moving cards to their zones, executing deathrattles, etc
 func (gs *GameState) cleanupState() {
-	// TODO (dz)
+	// check for PendingDestroy or lethal damage on minions
+	for minion, _ := range gs.CardsByZone["FRIENDLY PLAY"] {
+		if minion.PendingDestroy || (minion.Damage >= minion.Health) {
+			fmt.Println("Minion should die due to damage: ", minion)
+			gs.handleDeath(minion)
+		}
+	}
+}
+
+func (gs *GameState) handleDeath(minion *Card) {
+	// Execute deathrattle
+	runDeathrattleAction(gs, minion)
+	// Move to graveyard
+	gs.moveCard(minion, "FRIENDLY GRAVEYARD")
 }
 
 // A particular instance of a card in the game.
