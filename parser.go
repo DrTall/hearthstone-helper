@@ -120,6 +120,8 @@ func applyTagChange(args *LineParserApplyArgs) {
 	switch args.match["tag_name"] {
 	case "ATK":
 		card.Attack = tag_value
+	case "ARMOR":
+		card.Armor = tag_value
 	case "CHARGE":
 		card.Charge = tag_value == 1
 	case "COST":

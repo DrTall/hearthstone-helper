@@ -179,7 +179,12 @@ func (gs *GameState) dealDamage(target *Card, amount int32) {
 	if amount <= 0 {
 		return
 	}
-	target.Damage += amount
+
+	target.Armor -= amount
+	if target.Armor < 0 {
+		target.Damage -= target.Armor
+		target.Armor = 0
+	}
 
 	// We're not bad people, but we did a bad thing...
 	// TODO: Implement some kind of generic listener framework someday.
