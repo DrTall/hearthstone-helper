@@ -86,11 +86,12 @@ func (gs *GameState) moveCard(card *Card, newZone string) {
 // -------------------
 
 // use a card: either playing from hand, or using hero power
-func (gs *GameState) useCard(params *MoveParams) {
+func useCard(gs *GameState, params *MoveParams) {
 	playCard := params.CardOne
 	switch playCard.Zone {
 	// If played from hand
 	case "FRIENDLY HAND":
+    gs.Mana -= playCard.Cost
 		switch playCard.Type {
 		case "Minion":
 			// minion comes into play
@@ -124,11 +125,11 @@ func (gs *GameState) useCard(params *MoveParams) {
 	case "FRIENDLY PLAY":
 		// TODO (dz): is it easier for nextMoves to call use or attack?
 		fmt.Println("`useCard` called with a card on the field, using `attack` instead.")
-		gs.attack(params)
+		attack(gs, params)
 	// if using hero attack
 	case "FRIENDLY PLAY (Hero)":
 		fmt.Println("`useCard` called with hero card, using `attack` instead.")
-		gs.attack(params)
+		attack(gs, params)
 	default:
 		fmt.Println("Unrecognized Zone to play a card from: ", playCard.Zone)
 		panic("Unrecognized Zone to play a card from!")
@@ -164,9 +165,10 @@ func (gs *GameState) CreateNewMinion(jsonId string, zone string) {
 }
 
 // Minion attack or weapon attack (modifies `gs` and the cards in it).
-func (gs *GameState) attack(params *MoveParams) {
+func attack(gs *GameState, params *MoveParams) {
 	gs.dealDamage(params.CardOne, params.CardTwo.Attack)
 	gs.dealDamage(params.CardTwo, params.CardOne.Attack)
+	params.CardOne.Exhausted = true
 }
 
 func (gs *GameState) dealDamage(target *Card, amount int32) {

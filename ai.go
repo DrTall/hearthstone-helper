@@ -21,7 +21,7 @@ type Move struct {
 
 type DecisionTreeNode struct {
 	Gs                 *GameState
-	Moves              []Move
+	Moves              []*Move
 	SuccessProbability float32
 }
 
@@ -41,11 +41,43 @@ func getSingletonFromZone(zone string, node *DecisionTreeNode) (result *Card) {
 	return
 }
 
+func translateMoveToGs(gs *GameState, move *Move) {
+  if move.Params.CardOne != nil {
+    if card, ok := gs.CardsById[move.Params.CardOne.InstanceId]; ok {
+      move.Params.CardOne = card
+    } else {
+      panic("There is some kind of serious bug in DeepCopy")
+    }
+  }
+  if move.Params.CardTwo != nil {
+    if card, ok := gs.CardsById[move.Params.CardTwo.InstanceId]; ok {
+      move.Params.CardTwo = card
+    } else {
+      panic("There is some kind of serious bug in DeepCopy")
+    }
+  }
+}
+
+func generateNode(node *DecisionTreeNode, move *Move) *DecisionTreeNode {
+  fmt.Println("DEBUG: Testing out a move:", move.Params.Description)
+  newGs := node.Gs.DeepCopy()
+  translateMoveToGs(newGs, move)
+  move.ApplyMove(newGs, &move.Params)
+  newMoves := make([]*Move, len(node.Moves)+1)
+  copy(newMoves, node.Moves)
+  newMoves[len(newMoves)-1] = move
+  return &DecisionTreeNode{
+    Gs: newGs,
+    Moves: newMoves,
+    SuccessProbability: 1.0, // TODO: Actually think about this.
+  }
+}
+
 // Enumerate all of the possible next moves from the given GameState.
 // TODO things this function does not currently consider:
 //  Immune enemies (these are rare).
 //  Hero power (this is not due to complexity but mostly because it probably won't help us win).
-func getNextMoves(node *DecisionTreeNode, resultChan chan<- *Move) {
+func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode) {
 	// Pre-compute some useful stuff.
 	friendlyHero := getSingletonFromZone("FRIENDLY PLAY (Hero)", node)
 	enemyHero := getSingletonFromZone("OPPOSING PLAY (Hero)", node)
@@ -72,12 +104,12 @@ func getNextMoves(node *DecisionTreeNode, resultChan chan<- *Move) {
 			}
 			// Attack minion
 			desc := fmt.Sprintf("%v attacking %v", friendlyMinion.Name, enemyMinion.Name)
-			resultChan <- &Move{nil, MoveParams{CardOne: friendlyMinion, CardTwo: enemyMinion, Description: desc}}
+			workChan <- generateNode(node, &Move{attack, MoveParams{CardOne: friendlyMinion, CardTwo: enemyMinion, Description: desc}})
 		}
 		if !enemyTauntExists {
 			// Attack face
 			desc := fmt.Sprintf("%v attacking face (%v)", friendlyMinion.Name, enemyHero.Name)
-			resultChan <- &Move{nil, MoveParams{CardOne: friendlyMinion, CardTwo: enemyHero, Description: desc}}
+			workChan <- generateNode(node, &Move{attack, MoveParams{CardOne: friendlyMinion, CardTwo: enemyHero, Description: desc}})
 		}
 	}
 
@@ -90,12 +122,12 @@ func getNextMoves(node *DecisionTreeNode, resultChan chan<- *Move) {
 				continue
 			}
 			desc := fmt.Sprintf("You (%v) attacking %v", friendlyHero.Name, enemyMinion.Name)
-			resultChan <- &Move{nil, MoveParams{CardOne: friendlyHero, CardTwo: enemyMinion, Description: desc}}
+			workChan <- generateNode(node, &Move{attack, MoveParams{CardOne: friendlyHero, CardTwo: enemyMinion, Description: desc}})
 		}
 		if !enemyTauntExists {
 			// Attack face
 			desc := fmt.Sprintf("You (%v) attacking face (%v)", friendlyHero.Name, enemyHero.Name)
-			resultChan <- &Move{nil, MoveParams{CardOne: friendlyHero, CardTwo: enemyHero, Description: desc}}
+			workChan <- generateNode(node, &Move{attack, MoveParams{CardOne: friendlyHero, CardTwo: enemyHero, Description: desc}})
 		}
 	}
 
@@ -122,20 +154,20 @@ func getNextMoves(node *DecisionTreeNode, resultChan chan<- *Move) {
 		}
 		filter := getPlayCardTargetFilter(cardInHand)
 		if filter(nil) {
-			resultChan <- &Move{nil, MoveParams{CardOne: cardInHand, CardTwo: nil, Description: descPrefix}}
+			workChan <- generateNode(node, &Move{useCard, MoveParams{CardOne: cardInHand, CardTwo: nil, Description: descPrefix}})
 		} else {
 			couldTargetAny := false
 			for _, target := range node.Gs.CardsById {
 				if filter(target) {
 					couldTargetAny = true
 					desc := fmt.Sprintf("%v on %v", descPrefix, target.Name)
-					resultChan <- &Move{nil, MoveParams{CardOne: cardInHand, CardTwo: nil, Description: desc}}
+					workChan <- generateNode(node, &Move{useCard, MoveParams{CardOne: cardInHand, CardTwo: nil, Description: desc}})
 				}
 			}
 			if !couldTargetAny {
 				if cardInHand.Type == "Minion" {
 					fmt.Printf("DEBUG: Allowing %v to be played without a target since none exist.\n", cardInHand.Name)
-					resultChan <- &Move{nil, MoveParams{CardOne: cardInHand, CardTwo: nil, Description: descPrefix}}
+					workChan <- generateNode(node, &Move{useCard, MoveParams{CardOne: cardInHand, CardTwo: nil, Description: descPrefix}})
 				} else {
 					fmt.Printf("DEBUG: No valid targets for %v.\n", cardInHand.Name)
 				}
@@ -155,10 +187,14 @@ func WalkDecisionTree(gs *GameState, successChan <-chan *DecisionTreeNode, abort
 		time.Sleep(time.Second)
 		workChan <- &DecisionTreeNode{
 			Gs:                 gs,
-			Moves:              make([]Move, 0),
+			Moves:              make([]*Move, 0),
 			SuccessProbability: 1.0,
 		}
 	}()
+  totalNodes := 0
+  defer func() {
+    fmt.Printf("INFO: WalkDecisionTree exited after considering %v nodes.\n", totalNodes) 
+  }()
 	for {
 		select {
 		case <-abortChan:
@@ -168,18 +204,10 @@ func WalkDecisionTree(gs *GameState, successChan <-chan *DecisionTreeNode, abort
 			fmt.Println("DEBUG: Decision tree walk timing out...")
 			return
 		case node := <-workChan:
-			movesChan := make(chan *Move, 1000)
-			go func() {
-				for {
-					move := <-movesChan
-					fmt.Println("DEBUG: Here's a move: ", move.Params.Description)
-					// Deep copy node.Gs
-					// Apply move to gs to make new node.
-					// If we win, put node into successChan.
-					// Else put node into workChan.
-				}
-			}()
-			getNextMoves(node, movesChan) // Does not modify node.
+      totalNodes += 1
+      fmt.Printf("DEBUG: Working on a new node. It is %v levels deep.\n", len(node.Moves))
+      go generateNextNodes(node, workChan)
+      //return
 		case <-time.After(5 * time.Second):
 			fmt.Println("INFO: Analysis complete. You cannot win this turn.")
 			return
