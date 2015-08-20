@@ -11,14 +11,12 @@ import (
 var (
 	startTurnPattern = regexp.MustCompile(`Entity=GameEntity tag=STEP value=MAIN_ACTION`)
 	lineParsers      = []LineParser{
-		LineParser{applyManaUpdate, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
-			`TAG_CHANGE Entity=(?P<name>.*) tag=RESOURCES value=(?P<mana>\d+)`)},
 		LineParser{applyNewGame, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
 			`CREATE_GAME`)},
 		LineParser{applyTagChange, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
 			`TAG_CHANGE .*id=(?P<instance_id>\d+).*cardId=(?P<class_id>\S+).*tag=(?P<tag_name>ATK|ARMOR|COST|DAMAGE|FROZEN|HEALTH|TAUNT|SILENCED) value=(?P<tag_value>.*?)\r?$`)},
 		LineParser{applyTagChangeNoJsonId, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
-			`TAG_CHANGE .*id=(?P<instance_id>\d+).*tag=(?P<tag_name>ATK|ARMOR|CHARGE|COST|DAMAGE|EXHAUSTED|FROZEN|HEALTH|TAUNT|SILENCED) value=(?P<tag_value>.*?)\r?$`)},
+			`TAG_CHANGE .*id=(?P<instance_id>\d+).*tag=(?P<tag_name>ATK|ARMOR|CHARGE|COST|DAMAGE|EXHAUSTED|FROZEN|HEALTH|NUM_ATTACKS_THIS_TURN|TAUNT|SILENCED) value=(?P<tag_value>.*?)\r?$`)},
 		//LineParser{applyDebugWriteLine, regexp.MustCompile(`\[Zone\] ZoneChangeList.ProcessChanges\(\) -\s+` +
 		//  `id=.* local=.* \[name=(?P<name>.*) id=(?P<instanceId>.*) zone=.* zonePos=.* cardId=(?P<class_id>.*) player=(?P<player_id>.*)\] zone from (?P<zome_from>.*) -> (?P<zome_to>.*)`)},
 		LineParser{applyZoneChange, regexp.MustCompile(`\[Zone\] ZoneChangeList.ProcessChanges\(\) -\s+` +
@@ -26,6 +24,11 @@ var (
 		//LineParser{regexp.MustCompile(`\[Power\] .*`), applyDebugWriteLine},
 	}
 )
+
+func createManaUpdateParser(username string) {
+	lineParsers = append(lineParsers, LineParser{applyManaUpdate, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
+		`TAG_CHANGE Entity=` + username + ` tag=(?P<tag_name>RESOURCES|RESOURCES_USED|TEMP_RESOURCES) value=(?P<mana>\d+)`)})
+}
 
 // Consumes a Hearthstone log line.
 // turnStart -- Did this line indicate a player's turn just began?
@@ -134,6 +137,8 @@ func applyTagChange(args *LineParserApplyArgs) {
 		card.Frozen = tag_value == 1
 	case "HEALTH":
 		card.Health = tag_value
+	case "NUM_ATTACKS_THIS_TURN":
+		card.NumAttacksThisTurn = tag_value
 	case "TAUNT":
 		card.Taunt = tag_value == 1
 	case "SILENCED":
@@ -159,8 +164,14 @@ func applyTagChangeNoJsonId(args *LineParserApplyArgs) {
 func applyManaUpdate(args *LineParserApplyArgs) {
 	applyDebugWriteLine(args)
 	mana_str, _ := strconv.ParseInt(args.match["mana"], 10, 32)
-	args.gs.Mana = int32(mana_str)
-	args.gs.LastManaAdjustPlayer = args.match["name"]
+	switch args.match["tag_name"] {
+	case "RESOURCES":
+		args.gs.ManaMax = int32(mana_str)
+	case "RESOURCES_USED":
+		args.gs.ManaUsed = int32(mana_str)
+	case "TEMP_RESOURCES":
+		args.gs.ManaTemp = int32(mana_str)
+	}
 }
 
 func getLineGroups(line string, pattern *regexp.Regexp) map[string]string {

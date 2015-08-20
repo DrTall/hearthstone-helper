@@ -68,7 +68,7 @@ func getSingletonFromZone(gs *GameState, zone string, mustExist bool) (result *C
 		result = card
 	}
 	if numFound == 0 && mustExist {
-		panic(fmt.Sprintf("ERROR: Zero cards found in singleton zone: %v", zone))
+		fmt.Printf("ERROR: Zero cards found in singleton zone: %v\n", zone)
 	}
 	return
 }
@@ -105,6 +105,10 @@ func generateNode(node *DecisionTreeNode, move *MoveParams) *DecisionTreeNode {
 	}
 }
 
+func canCardAttack(card *Card) bool {
+	return !(card.NumAttacksThisTurn > 0 || (card.Exhausted && !card.Charge) || card.Frozen || card.Attack == 0)
+}
+
 // Enumerate all of the possible next moves from the given GameState.
 // TODO things this function does not currently consider:
 //  Immune enemies (these are rare).
@@ -112,6 +116,9 @@ func generateNode(node *DecisionTreeNode, move *MoveParams) *DecisionTreeNode {
 func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode) {
 	// Pre-compute some useful stuff.
 	friendlyHero := getSingletonFromZone(node.Gs, "FRIENDLY PLAY (Hero)", true)
+	if friendlyHero == nil {
+		return
+	}
 	enemyHero := getSingletonFromZone(node.Gs, "OPPOSING PLAY (Hero)", true)
 	enemyTauntExists := false
 	for enemyMinion := range node.Gs.CardsByZone["OPPOSING PLAY"] {
@@ -123,7 +130,7 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 
 	// Minions can attack minions or face.
 	for friendlyMinion := range node.Gs.CardsByZone["FRIENDLY PLAY"] {
-		if friendlyMinion.Exhausted || friendlyMinion.Frozen || friendlyMinion.Attack == 0 {
+		if !canCardAttack(friendlyMinion) {
 			// This minion can't attack.
 			//fmt.Printf("DEBUG: %v is in play but can't attack for some reason.\n", friendlyMinion.Name)
 			continue
@@ -146,7 +153,7 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 	}
 
 	// Hero can attack minions or face with a weapon.
-	if friendlyHero.Attack > 0 && !friendlyHero.Exhausted {
+	if canCardAttack(friendlyHero) {
 		for enemyMinion := range node.Gs.CardsByZone["OPPOSING PLAY"] {
 			if enemyTauntExists && !enemyMinion.Taunt {
 				// This minion can't be attacked.
@@ -165,8 +172,9 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 
 	// Spells, Minions, and Weapons can be played including targets maybe.
 	numFriendlyMinions := len(node.Gs.CardsByZone["FRIENDLY PLAY"])
+	availableMana := node.Gs.ManaMax - node.Gs.ManaUsed + node.Gs.ManaTemp
 	for cardInHand := range node.Gs.CardsByZone["FRIENDLY HAND"] {
-		if cardInHand.Cost > node.Gs.Mana {
+		if cardInHand.Cost > availableMana {
 			// Too expensive.
 			//fmt.Printf("DEBUG: %v is too expensive to play.\n", getPrettyCardDesc(cardInHand)
 			continue
@@ -245,7 +253,7 @@ func WalkDecisionTree(gs *GameState, solutionChan chan<- *DecisionTreeNode, abor
 			fmt.Println("WARN: It's been 70 seconds now.")
 		case node := <-workChan:
 			if totalNodes == 0 {
-					fmt.Println("DEBUG: Beginning decision tree walk.")
+				fmt.Println("DEBUG: Beginning decision tree walk.")
 			}
 			totalNodes += 1
 			if totalNodes%100000 == 0 {

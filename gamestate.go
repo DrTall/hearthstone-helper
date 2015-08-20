@@ -12,12 +12,13 @@ const (
 )
 
 type GameState struct {
-	CardsById            map[int32]*Card
-	CardsByZone          map[string]map[*Card]interface{}
-	Mana                 int32
-	LastManaAdjustPlayer string
-	HighestCardId        int32
-	Winner               int32
+	CardsById     map[int32]*Card
+	CardsByZone   map[string]map[*Card]interface{}
+	ManaMax       int32
+	ManaUsed      int32
+	ManaTemp      int32
+	HighestCardId int32
+	Winner        int32
 }
 
 // Can't just use deepcopy.Copy because of CardsByZone's pointer keys.
@@ -29,8 +30,9 @@ func (gs *GameState) DeepCopy() *GameState {
 		result.CardsById[id] = &cardCopy
 		result.moveCard(&cardCopy, cardCopy.Zone) // Populate CardsByZone
 	}
-	result.Mana = gs.Mana
-	result.LastManaAdjustPlayer = gs.LastManaAdjustPlayer
+	result.ManaMax = gs.ManaMax
+	result.ManaUsed = gs.ManaUsed
+	result.ManaTemp = gs.ManaTemp
 	result.HighestCardId = gs.HighestCardId
 	result.Winner = gs.Winner
 	return &result
@@ -39,8 +41,9 @@ func (gs *GameState) DeepCopy() *GameState {
 func (gs *GameState) resetGameState() {
 	gs.CardsById = make(map[int32]*Card)
 	gs.CardsByZone = make(map[string]map[*Card]interface{})
-	gs.Mana = 0
-	gs.LastManaAdjustPlayer = "NOBODY?!"
+	gs.ManaMax = 0
+	gs.ManaUsed = 0
+	gs.ManaTemp = 0
 	gs.HighestCardId = 0
 	gs.Winner = NO_VICTORY
 }
@@ -90,7 +93,11 @@ func useCard(gs *GameState, params *MoveParams) {
 	switch playCard.Zone {
 	// If played from hand
 	case "FRIENDLY HAND":
-		gs.Mana -= playCard.Cost
+		gs.ManaTemp -= playCard.Cost
+		if gs.ManaTemp < 0 {
+			gs.ManaUsed -= gs.ManaTemp
+			gs.ManaTemp = 0
+		}
 		switch playCard.Type {
 		case "Minion":
 			// Warsong Commander
@@ -172,7 +179,7 @@ func (gs *GameState) CreateNewMinion(jsonId string, zone string) {
 func attack(gs *GameState, params *MoveParams) {
 	gs.dealDamage(params.CardOne, params.CardTwo.Attack)
 	gs.dealDamage(params.CardTwo, params.CardOne.Attack)
-	params.CardOne.Exhausted = true
+	params.CardOne.NumAttacksThisTurn += 1
 }
 
 func (gs *GameState) dealDamage(target *Card, amount int32) {
@@ -253,20 +260,21 @@ func (gs *GameState) handleDeath(minion *Card) {
 
 // A particular instance of a card in the game.
 type Card struct {
-	InstanceId     int32  // Globally unique.
-	JsonCardId     string // Refers to JsonCardData.Id
-	Type           string // Refers to JsonCardData.Type
-	Name           string // Refers to JsonCardData.Name
-	Cost           int32
-	Attack         int32
-	Health         int32
-	Armor          int32
-	Damage         int32
-	Charge         bool
-	Exhausted      bool
-	Frozen         bool
-	Taunt          bool
-	Silenced       bool
-	Zone           string
-	PendingDestroy bool // Internal. Should this minion be destroyed in the next cleanup step?
+	InstanceId         int32  // Globally unique.
+	JsonCardId         string // Refers to JsonCardData.Id
+	Type               string // Refers to JsonCardData.Type
+	Name               string // Refers to JsonCardData.Name
+	Cost               int32
+	Attack             int32
+	Health             int32
+	Armor              int32
+	Damage             int32
+	NumAttacksThisTurn int32
+	Charge             bool
+	Exhausted          bool
+	Frozen             bool
+	Taunt              bool
+	Silenced           bool
+	Zone               string
+	PendingDestroy     bool // Internal. Should this minion be destroyed in the next cleanup step?
 }

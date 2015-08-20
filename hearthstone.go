@@ -25,9 +25,11 @@ func prettyPrintDecisionTreeNode(node *DecisionTreeNode) {
 
 func main() {
 	hsLogFile := flag.String("log", "no-log-file-specified", "The file path to the Hearthstone log file.")
+	hsUsername := flag.String("username", "no-username-specified", "Your battlenet ID (without the #1234).")
 
 	flag.Parse()
 
+	createManaUpdateParser(*hsUsername)
 	log, _ := tail.TailFile(*hsLogFile, tail.Config{Follow: true})
 
 	gs := GameState{}

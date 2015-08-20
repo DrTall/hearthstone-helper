@@ -52,8 +52,8 @@ var GlobalCardPlayedActions = map[string]func(gs *GameState, params *MoveParams)
 	"EX1_607": taskmasterAction,                                                             // Inner Rage
 	"EX1_391": func(gs *GameState, params *MoveParams) { gs.dealDamage(params.CardTwo, 2) }, // Slam -- TODO how do we handle card draw?
 	"GAME_005": func(gs *GameState, params *MoveParams) {
-		if gs.Mana < 10 {
-			gs.Mana += 1
+		if gs.ManaMax < 10 || gs.ManaUsed > 0 {
+			gs.ManaTemp += 1
 		}
 	}, // The Coin
 	"EX1_400": whirlwindAction, // Whirlwind
