@@ -26,9 +26,9 @@ type DecisionTreeNode struct {
 }
 
 // Hack around the fact that you have to iterate to get a map key.
-func getSingletonFromZone(zone string, node *DecisionTreeNode) (result *Card) {
+func getSingletonFromZone(zone string, gs *GameState) (result *Card) {
 	numFound := 0
-	for card := range node.Gs.CardsByZone[zone] {
+	for card := range gs.CardsByZone[zone] {
 		numFound += 1
 		if numFound > 1 {
 			fmt.Println("ERROR: Multiple cards found in singleton zone!", zone)
@@ -42,35 +42,35 @@ func getSingletonFromZone(zone string, node *DecisionTreeNode) (result *Card) {
 }
 
 func translateMoveToGs(gs *GameState, move *Move) {
-  if move.Params.CardOne != nil {
-    if card, ok := gs.CardsById[move.Params.CardOne.InstanceId]; ok {
-      move.Params.CardOne = card
-    } else {
-      panic("There is some kind of serious bug in DeepCopy")
-    }
-  }
-  if move.Params.CardTwo != nil {
-    if card, ok := gs.CardsById[move.Params.CardTwo.InstanceId]; ok {
-      move.Params.CardTwo = card
-    } else {
-      panic("There is some kind of serious bug in DeepCopy")
-    }
-  }
+	if move.Params.CardOne != nil {
+		if card, ok := gs.CardsById[move.Params.CardOne.InstanceId]; ok {
+			move.Params.CardOne = card
+		} else {
+			panic("There is some kind of serious bug in DeepCopy")
+		}
+	}
+	if move.Params.CardTwo != nil {
+		if card, ok := gs.CardsById[move.Params.CardTwo.InstanceId]; ok {
+			move.Params.CardTwo = card
+		} else {
+			panic("There is some kind of serious bug in DeepCopy")
+		}
+	}
 }
 
 func generateNode(node *DecisionTreeNode, move *Move) *DecisionTreeNode {
-  fmt.Println("DEBUG: Testing out a move:", move.Params.Description)
-  newGs := node.Gs.DeepCopy()
-  translateMoveToGs(newGs, move)
-  move.ApplyMove(newGs, &move.Params)
-  newMoves := make([]*Move, len(node.Moves)+1)
-  copy(newMoves, node.Moves)
-  newMoves[len(newMoves)-1] = move
-  return &DecisionTreeNode{
-    Gs: newGs,
-    Moves: newMoves,
-    SuccessProbability: 1.0, // TODO: Actually think about this.
-  }
+	//fmt.Println("DEBUG: Testing out a move:", move.Params.Description)
+	newGs := node.Gs.DeepCopy()
+	translateMoveToGs(newGs, move)
+	move.ApplyMove(newGs, &move.Params)
+	newMoves := make([]*Move, len(node.Moves)+1)
+	copy(newMoves, node.Moves)
+	newMoves[len(newMoves)-1] = move
+	return &DecisionTreeNode{
+		Gs:                 newGs,
+		Moves:              newMoves,
+		SuccessProbability: 1.0, // TODO: Actually think about this.
+	}
 }
 
 // Enumerate all of the possible next moves from the given GameState.
@@ -79,8 +79,8 @@ func generateNode(node *DecisionTreeNode, move *Move) *DecisionTreeNode {
 //  Hero power (this is not due to complexity but mostly because it probably won't help us win).
 func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode) {
 	// Pre-compute some useful stuff.
-	friendlyHero := getSingletonFromZone("FRIENDLY PLAY (Hero)", node)
-	enemyHero := getSingletonFromZone("OPPOSING PLAY (Hero)", node)
+	friendlyHero := getSingletonFromZone("FRIENDLY PLAY (Hero)", node.Gs)
+	enemyHero := getSingletonFromZone("OPPOSING PLAY (Hero)", node.Gs)
 	enemyTauntExists := false
 	for enemyMinion := range node.Gs.CardsByZone["OPPOSING PLAY"] {
 		if enemyMinion.Taunt {
@@ -93,13 +93,13 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 	for friendlyMinion := range node.Gs.CardsByZone["FRIENDLY PLAY"] {
 		if friendlyMinion.Exhausted || friendlyMinion.Frozen || friendlyMinion.Attack == 0 {
 			// This minion can't attack.
-			fmt.Printf("DEBUG: %v is in play but can't attack for some reason.\n", friendlyMinion.Name)
+			//fmt.Printf("DEBUG: %v is in play but can't attack for some reason.\n", friendlyMinion.Name)
 			continue
 		}
 		for enemyMinion := range node.Gs.CardsByZone["OPPOSING PLAY"] {
 			if enemyTauntExists && !enemyMinion.Taunt {
 				// This minion can't be attacked.
-				fmt.Printf("DEBUG: %v is protected by a taunt minion.\n", enemyMinion.Name)
+				//fmt.Printf("DEBUG: %v is protected by a taunt minion.\n", enemyMinion.Name)
 				continue
 			}
 			// Attack minion
@@ -118,7 +118,7 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 		for enemyMinion := range node.Gs.CardsByZone["OPPOSING PLAY"] {
 			if enemyTauntExists && !enemyMinion.Taunt {
 				// This minion can't be attacked.
-				fmt.Printf("DEBUG: %v is protected by a taunt minion.\n", enemyMinion.Name)
+				//fmt.Printf("DEBUG: %v is protected by a taunt minion.\n", enemyMinion.Name)
 				continue
 			}
 			desc := fmt.Sprintf("You (%v) attacking %v", friendlyHero.Name, enemyMinion.Name)
@@ -136,7 +136,7 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 	for cardInHand := range node.Gs.CardsByZone["FRIENDLY HAND"] {
 		if cardInHand.Cost > node.Gs.Mana {
 			// Too expensive.
-			fmt.Printf("DEBUG: %v is too expensive to play.\n", cardInHand.Name)
+			//fmt.Printf("DEBUG: %v is too expensive to play.\n", cardInHand.Name)
 			continue
 		}
 		var descPrefix string
@@ -147,7 +147,7 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 			descPrefix = fmt.Sprintf("Equip %v", cardInHand.Name)
 		case "Minion":
 			if numFriendlyMinions >= 7 {
-				fmt.Printf("DEBUG: No space on the board to play %v.\n", cardInHand.Name)
+				//fmt.Printf("DEBUG: No space on the board to play %v.\n", cardInHand.Name)
 				continue
 			}
 			descPrefix = fmt.Sprintf("Play %v", cardInHand.Name)
@@ -166,20 +166,20 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 			}
 			if !couldTargetAny {
 				if cardInHand.Type == "Minion" {
-					fmt.Printf("DEBUG: Allowing %v to be played without a target since none exist.\n", cardInHand.Name)
+					//fmt.Printf("DEBUG: Allowing %v to be played without a target since none exist.\n", cardInHand.Name)
 					workChan <- generateNode(node, &Move{useCard, MoveParams{CardOne: cardInHand, CardTwo: nil, Description: descPrefix}})
 				} else {
-					fmt.Printf("DEBUG: No valid targets for %v.\n", cardInHand.Name)
+					//fmt.Printf("DEBUG: No valid targets for %v.\n", cardInHand.Name)
 				}
 			}
 		}
 	}
 }
 
-func WalkDecisionTree(gs *GameState, successChan <-chan *DecisionTreeNode, abortChan <-chan time.Time) {
+func WalkDecisionTree(gs *GameState, successChan chan<- *DecisionTreeNode, abortChan <-chan time.Time) {
 	fmt.Println("DEBUG: Beginning decision tree walk.")
 	workChan := make(chan *DecisionTreeNode, 1000)
-	timeoutChan := time.After(time.Second * 70)
+	timeoutChan := time.After(time.Second * 700000)
 
 	// Sleep briefly before kicking off the work, since it will get cancelled
 	// very quickly in turns where the human operator knows there's no hope.
@@ -191,10 +191,10 @@ func WalkDecisionTree(gs *GameState, successChan <-chan *DecisionTreeNode, abort
 			SuccessProbability: 1.0,
 		}
 	}()
-  totalNodes := 0
-  defer func() {
-    fmt.Printf("INFO: WalkDecisionTree exited after considering %v nodes.\n", totalNodes) 
-  }()
+	var totalNodes, maxDepth int
+	defer func() {
+		fmt.Printf("INFO: WalkDecisionTree exited after considering %v nodes with maxDepth %v.\n", totalNodes, maxDepth)
+	}()
 	for {
 		select {
 		case <-abortChan:
@@ -204,10 +204,33 @@ func WalkDecisionTree(gs *GameState, successChan <-chan *DecisionTreeNode, abort
 			fmt.Println("DEBUG: Decision tree walk timing out...")
 			return
 		case node := <-workChan:
-      totalNodes += 1
-      fmt.Printf("DEBUG: Working on a new node. It is %v levels deep.\n", len(node.Moves))
-      go generateNextNodes(node, workChan)
-      //return
+			totalNodes += 1
+			depth := len(node.Moves)
+			if depth > maxDepth {
+				fmt.Printf("DEBUG: New depth reached: %v. Seen %v nodes so far.\n", depth, totalNodes)
+				maxDepth = depth
+			}
+			//fmt.Printf("DEBUG: Working on a new node. It is %v levels deep.\n", len(node.Moves))
+			/*if len(node.Moves) > 100 {
+			  out := ""
+			  for _, move := range node.Moves {
+			    out += move.Params.Description + "~"
+			  }
+			  fmt.Printf("FATAL: %v", out)
+			  return
+			}*/
+			switch node.Gs.Winner {
+			case FRIENDLY_VICTORY:
+				successChan <- node
+				return
+			case NO_VICTORY:
+				go generateNextNodes(node, workChan)
+			case OPPOSING_VICTORY_OR_DRAW:
+				// Do nothing
+			default:
+				panic("Unknown Winner state")
+			}
+			//return
 		case <-time.After(5 * time.Second):
 			fmt.Println("INFO: Analysis complete. You cannot win this turn.")
 			return

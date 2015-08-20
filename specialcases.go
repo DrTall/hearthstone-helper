@@ -46,7 +46,12 @@ var GlobalCardPlayedActions = map[string]func(gs *GameState, params *MoveParams)
 	// "CS2_147": // Gnomish Inventor -- TODO how do we handle card draw?
 	"EX1_607": taskmasterAction,                                                             // Inner Rage
 	"EX1_391": func(gs *GameState, params *MoveParams) { gs.dealDamage(params.CardTwo, 2) }, // Slam -- TODO how do we handle card draw?
-	"EX1_400": whirlwindAction,                                                              // Whirlwind
+	"GAME_005": func(gs *GameState, params *MoveParams) {
+		if gs.Mana < 10 {
+			gs.Mana += 1
+		}
+	}, // The Coin
+	"EX1_400": whirlwindAction, // Whirlwind
 }
 
 func taskmasterAction(gs *GameState, params *MoveParams) {

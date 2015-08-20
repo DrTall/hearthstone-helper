@@ -4,12 +4,20 @@ package main
 
 import "fmt"
 
+// Who won this game?
+const (
+	NO_VICTORY = iota
+	FRIENDLY_VICTORY
+	OPPOSING_VICTORY_OR_DRAW
+)
+
 type GameState struct {
 	CardsById            map[int32]*Card
 	CardsByZone          map[string]map[*Card]interface{}
 	Mana                 int32
 	LastManaAdjustPlayer string
 	HighestCardId        int32
+	Winner               int32
 }
 
 // Can't just use deepcopy.Copy because of CardsByZone's pointer keys.
@@ -23,6 +31,8 @@ func (gs *GameState) DeepCopy() *GameState {
 	}
 	result.Mana = gs.Mana
 	result.LastManaAdjustPlayer = gs.LastManaAdjustPlayer
+	result.HighestCardId = gs.HighestCardId
+	result.Winner = gs.Winner
 	return &result
 }
 
@@ -32,6 +42,7 @@ func (gs *GameState) resetGameState() {
 	gs.Mana = 0
 	gs.LastManaAdjustPlayer = "NOBODY?!"
 	gs.HighestCardId = 0
+	gs.Winner = NO_VICTORY
 }
 
 func (gs *GameState) getOrCreateCard(jsonCardId string, instanceId int32) *Card {
@@ -58,18 +69,6 @@ func (gs *GameState) moveCard(card *Card, newZone string) {
 		}
 	}
 
-	// Warsong Commander
-	if newZone == "FRIENDLY PLAY" && card.Attack <= 3 {
-		for friendlyMinion := range gs.CardsByZone["FRIENDLY PLAY"] {
-			if friendlyMinion.JsonCardId == "EX1_084" && !friendlyMinion.Silenced {
-				fmt.Println("DEBUG: Getting charge from Warsong Commander.")
-				card.Charge = true
-				card.Exhausted = false
-				break
-			}
-		}
-	}
-
 	if _, ok := gs.CardsByZone[newZone]; !ok {
 		gs.CardsByZone[newZone] = make(map[*Card]interface{})
 	}
@@ -91,11 +90,21 @@ func useCard(gs *GameState, params *MoveParams) {
 	switch playCard.Zone {
 	// If played from hand
 	case "FRIENDLY HAND":
-    gs.Mana -= playCard.Cost
+		gs.Mana -= playCard.Cost
 		switch playCard.Type {
 		case "Minion":
 			// minion comes into play
 			gs.moveCard(playCard, "FRIENDLY PLAY")
+			// Warsong Commander
+			if playCard.Attack <= 3 {
+				for friendlyMinion := range gs.CardsByZone["FRIENDLY PLAY"] {
+					if friendlyMinion.JsonCardId == "EX1_084" && !friendlyMinion.Silenced {
+						//fmt.Println("DEBUG: Getting charge from Warsong Commander.")
+						playCard.Charge = true
+						playCard.Exhausted = false
+					}
+				}
+			}
 			// battlecry effects, if any
 			runCardPlayedAction(gs, params)
 		case "Spell":
@@ -140,15 +149,15 @@ func useCard(gs *GameState, params *MoveParams) {
 // Run the action out of GlobalCardPlayedActions for a given move.
 func runCardPlayedAction(gs *GameState, params *MoveParams) {
 	// fmt.Println("DEBUG: running action for move: ", params)
-  getCardPlayedAction(params.CardOne)(gs, params)
+	getCardPlayedAction(params.CardOne)(gs, params)
 }
 
 // Run the action out of GlobalDeathrattleActions for a given card.
 func runDeathrattleAction(gs *GameState, dyingMinion *Card) {
-  getDeathrattleAction(dyingMinion)(gs, &MoveParams{
-    CardOne:     dyingMinion,
-    Description: "Dummy move param for deathrattle",
-  })
+	getDeathrattleAction(dyingMinion)(gs, &MoveParams{
+		CardOne:     dyingMinion,
+		Description: "Dummy move param for deathrattle",
+	})
 }
 
 func (gs *GameState) CreateNewMinion(jsonId string, zone string) {
@@ -161,6 +170,7 @@ func attack(gs *GameState, params *MoveParams) {
 	gs.dealDamage(params.CardOne, params.CardTwo.Attack)
 	gs.dealDamage(params.CardTwo, params.CardOne.Attack)
 	params.CardOne.Exhausted = true
+	gs.cleanupState()
 }
 
 func (gs *GameState) dealDamage(target *Card, amount int32) {
@@ -170,31 +180,57 @@ func (gs *GameState) dealDamage(target *Card, amount int32) {
 	// TODO: Implement some kind of generic listener framework someday.
 	if target.JsonCardId == "BRM_019" && !target.Silenced &&
 		target.Damage < target.Health && len(gs.CardsByZone[target.Zone]) < 7 { // Grim Patron
-		fmt.Println("DEBUG: Everyone! Get in here!")
-		gs.CreateNewMinion(target.Zone, "BRM_019")
+		//fmt.Println("DEBUG: Everyone! Get in here!")
+		gs.CreateNewMinion("BRM_019", target.Zone)
 	}
 	for friendlyMinion := range gs.CardsByZone["FRIENDLY PLAY"] {
 		if friendlyMinion.JsonCardId == "EX1_604" && !friendlyMinion.Silenced { // Frothing Berserker
-			fmt.Println("DEBUG: My blade be thirsty!")
+			//fmt.Println("DEBUG: My blade be thirsty!")
 			friendlyMinion.Attack += 1
 		}
 	}
 	for enemyMinion := range gs.CardsByZone["OPPOSING PLAY"] {
 		if enemyMinion.JsonCardId == "EX1_604" && !enemyMinion.Silenced { // Frothing Berserker
-			fmt.Println("DEBUG: Enemy Frothing Berserker triggered.")
+			//fmt.Println("DEBUG: Enemy Frothing Berserker triggered.")
 			enemyMinion.Attack += 1
 		}
 	}
 }
 
+func minionNeedsKilling(card *Card) bool {
+	return card.PendingDestroy || card.Damage > card.Health
+}
+
 // Clean up the gs state, moving cards to their zones, executing deathrattles, etc
 func (gs *GameState) cleanupState() {
 	// check for PendingDestroy or lethal damage on minions
+	didAnything := false
+	friendlyHero := getSingletonFromZone("FRIENDLY PLAY (Hero)", gs)
+	enemyHero := getSingletonFromZone("OPPOSING PLAY (Hero)", gs)
+	if minionNeedsKilling(friendlyHero) {
+		//fmt.Println("DEBUG: Oops, we died.")
+		gs.Winner = OPPOSING_VICTORY_OR_DRAW
+	} else if minionNeedsKilling(enemyHero) && gs.Winner == NO_VICTORY {
+		//fmt.Println("DEBUG: Victory!")
+		gs.Winner = FRIENDLY_VICTORY
+	}
+
 	for minion, _ := range gs.CardsByZone["FRIENDLY PLAY"] {
 		if minion.PendingDestroy || (minion.Damage >= minion.Health) {
-			fmt.Println("Minion should die due to damage: ", minion)
+			didAnything = true
+			//fmt.Println("Minion should die due to damage: ", minion)
 			gs.handleDeath(minion)
 		}
+	}
+	for minion, _ := range gs.CardsByZone["OPPOSING PLAY"] {
+		if minion.PendingDestroy || (minion.Damage >= minion.Health) {
+			didAnything = true
+			//fmt.Println("Minion should die due to damage: ", minion)
+			gs.handleDeath(minion)
+		}
+	}
+	if didAnything {
+		gs.cleanupState()
 	}
 }
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -37,8 +38,11 @@ func main() {
 				abortChan = nil
 			}
 		case solution := <-successChan:
-			fmt.Println("DEBUG: Found a solution!")
-			prettyPrint(*solution)
+			var buffer bytes.Buffer
+			for _, move := range solution.Moves {
+				buffer.WriteString(move.Params.Description + "\n")
+			}
+			fmt.Println(buffer.String())
 		}
 	}
 }
