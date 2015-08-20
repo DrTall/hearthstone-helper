@@ -38,17 +38,19 @@ func targetAnyMinion(card *Card) bool {
 // It is up to the caller to call gs.cleanupState afterwards.
 var GlobalCardPlayedActions = map[string]func(gs *GameState, params *MoveParams){
 	// "EX1_392": // Battle Rage -- TODO how do we handle card draw?
-	"EX1_603": func(gs *GameState, params *MoveParams) {
-		if params.CardTwo != nil {
-			params.CardTwo.Attack += 2
-			gs.dealDamage(params.CardTwo, 1)
-		}
-	}, // Cruel Taskmaster
-	"CS2_108": func(gs *GameState, params *MoveParams) { params.CardOne.PendingDestroy = true }, // Execute
+	"EX1_603": taskmasterAction,                                                                 // Cruel Taskmaster
+	"CS2_108": func(gs *GameState, params *MoveParams) { params.CardTwo.PendingDestroy = true }, // Execute
 	// "CS2_147": // Gnomish Inventor -- TODO how do we handle card draw?
-	"EX1_607": func(gs *GameState, params *MoveParams) { params.CardOne.Attack += 2; gs.dealDamage(params.CardOne, 1) }, // Inner Rage
-	"EX1_391": func(gs *GameState, params *MoveParams) { gs.dealDamage(params.CardOne, 2) },                             // Slam -- TODO how do we handle card draw?
-	"EX1_400": whirlwindAction,                                                                                          // Whirlwind
+	"EX1_607": taskmasterAction,                                                             // Inner Rage
+	"EX1_391": func(gs *GameState, params *MoveParams) { gs.dealDamage(params.CardTwo, 2) }, // Slam -- TODO how do we handle card draw?
+	"EX1_400": whirlwindAction,                                                              // Whirlwind
+}
+
+func taskmasterAction(gs *GameState, params *MoveParams) {
+	if params.CardTwo != nil {
+		params.CardTwo.Attack += 2
+		gs.dealDamage(params.CardTwo, 1)
+	}
 }
 
 func whirlwindAction(gs *GameState, _ *MoveParams) {
