@@ -209,7 +209,6 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 }
 
 func WalkDecisionTree(gs *GameState, solutionChan chan<- *DecisionTreeNode, abortChan <-chan time.Time) {
-	fmt.Println("DEBUG: Beginning decision tree walk.")
 	workChan := make(chan *DecisionTreeNode, 1000)
 	softTimeoutChan := time.After(time.Second * 70)
 	timeoutChan := time.After(time.Second * 300)
@@ -226,15 +225,18 @@ func WalkDecisionTree(gs *GameState, solutionChan chan<- *DecisionTreeNode, abor
 	}()
 	var totalNodes, maxDepth int
 	var deepestNode *DecisionTreeNode
+	anySolution := false
 	defer func() {
 		fmt.Printf("INFO: WalkDecisionTree exited after considering %v nodes with maxDepth %v.\n", totalNodes, maxDepth)
-		fmt.Println("Deepest node discovered:")
-		prettyPrintDecisionTreeNode(deepestNode)
+		if !anySolution && totalNodes > 0 {
+			fmt.Println("Sorry you didn't win. Here is the deepest node discovered:")
+			prettyPrintDecisionTreeNode(deepestNode)
+		}
 	}()
 	for {
 		select {
 		case <-abortChan:
-			fmt.Println("DEBUG: Decision tree walk aborting...")
+			//fmt.Println("DEBUG: Decision tree walk aborting...")
 			return
 		case <-timeoutChan:
 			fmt.Println("DEBUG: Decision tree walk timing out...")
@@ -242,6 +244,9 @@ func WalkDecisionTree(gs *GameState, solutionChan chan<- *DecisionTreeNode, abor
 		case <-softTimeoutChan:
 			fmt.Println("WARN: It's been 70 seconds now.")
 		case node := <-workChan:
+			if totalNodes == 0 {
+					fmt.Println("DEBUG: Beginning decision tree walk.")
+			}
 			totalNodes += 1
 			if totalNodes%100000 == 0 {
 				fmt.Printf("DEBUG: Seen %v nodes so far.\n", totalNodes)
@@ -263,6 +268,7 @@ func WalkDecisionTree(gs *GameState, solutionChan chan<- *DecisionTreeNode, abor
 			}*/
 			switch node.Gs.Winner {
 			case FRIENDLY_VICTORY:
+				anySolution = true
 				solutionChan <- node
 			case NO_VICTORY:
 				go generateNextNodes(node, workChan)

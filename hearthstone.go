@@ -38,16 +38,17 @@ func main() {
 	for {
 		select {
 		case line := <-log.Lines:
-			if turnStart, somethingHappened := ParseHearthstoneLogLine(line.Text, &gs); turnStart && abortChan == nil {
-				fmt.Println("It is the start of turn for:", gs.LastManaAdjustPlayer)
+			if turnStart, somethingHappened := ParseHearthstoneLogLine(line.Text, &gs); turnStart || somethingHappened {
+				//fmt.Println("It is the start of turn for:", gs.LastManaAdjustPlayer)
+				if abortChan != nil {
+					*abortChan <- time.Now()
+					abortChan = nil
+					deepestSolution = nil
+					shortestSolution = nil
+				}
 				newAbortChan := make(chan time.Time, 1)
 				abortChan = &newAbortChan
 				go WalkDecisionTree(gs.DeepCopy(), solutionChan, newAbortChan)
-			} else if somethingHappened && abortChan != nil {
-				*abortChan <- time.Now()
-				abortChan = nil
-				deepestSolution = nil
-				shortestSolution = nil
 			}
 		case solution := <-solutionChan:
 			if deepestSolution == nil {
