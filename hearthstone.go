@@ -14,6 +14,16 @@ func prettyPrint(x interface{}) {
 	fmt.Println(string(json))
 }
 
+func prettyPrintDecisionTreeNode(node *DecisionTreeNode) {
+	if node == nil {
+		fmt.Println("nil")
+		return
+	}
+	for i, move := range node.Moves {
+		fmt.Printf("%v.  %v\n", i+1, move.Description)
+	}
+}
+
 func main() {
 	hsLogFile := flag.String("log", "no-log-file-specified", "The file path to the Hearthstone log file.")
 
@@ -40,7 +50,7 @@ func main() {
 		case solution := <-successChan:
 			var buffer bytes.Buffer
 			for _, move := range solution.Moves {
-				buffer.WriteString(move.Params.Description + "\n")
+				buffer.WriteString(move.Description + "\n")
 			}
 			fmt.Println(buffer.String())
 		}

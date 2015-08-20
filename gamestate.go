@@ -133,11 +133,11 @@ func useCard(gs *GameState, params *MoveParams) {
 	// If on battlefield, then this is a minion attack.
 	case "FRIENDLY PLAY":
 		// TODO (dz): is it easier for nextMoves to call use or attack?
-		fmt.Println("`useCard` called with a card on the field, using `attack` instead.")
+		//fmt.Println("`useCard` called with a card on the field, using `attack` instead.")
 		attack(gs, params)
 	// if using hero attack
 	case "FRIENDLY PLAY (Hero)":
-		fmt.Println("`useCard` called with hero card, using `attack` instead.")
+		//fmt.Println("`useCard` called with hero card, using `attack` instead.")
 		attack(gs, params)
 	default:
 		fmt.Println("Unrecognized Zone to play a card from: ", playCard.Zone)
@@ -170,7 +170,6 @@ func attack(gs *GameState, params *MoveParams) {
 	gs.dealDamage(params.CardOne, params.CardTwo.Attack)
 	gs.dealDamage(params.CardTwo, params.CardOne.Attack)
 	params.CardOne.Exhausted = true
-	gs.cleanupState()
 }
 
 func (gs *GameState) dealDamage(target *Card, amount int32) {
