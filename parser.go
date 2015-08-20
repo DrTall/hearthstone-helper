@@ -16,13 +16,13 @@ var (
 		LineParser{applyNewGame, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
 			`CREATE_GAME`)},
 		LineParser{applyTagChange, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
-			`TAG_CHANGE .*id=(?P<instance_id>\d+).*cardId=(?P<class_id>\S+).*tag=(?P<tag_name>ATK|ARMOR|COST|DAMAGE|FROZEN|HEALTH|TAUNT|SILENCED) value=(?P<tag_value>.*)`)},
+			`TAG_CHANGE .*id=(?P<instance_id>\d+).*cardId=(?P<class_id>\S+).*tag=(?P<tag_name>ATK|ARMOR|COST|DAMAGE|FROZEN|HEALTH|TAUNT|SILENCED) value=(?P<tag_value>.*?)\r?$`)},
 		LineParser{applyTagChangeNoJsonId, regexp.MustCompile(`\[Power\] GameState.DebugPrintPower\(\) -\s+` +
-			`TAG_CHANGE .*id=(?P<instance_id>\d+).*tag=(?P<tag_name>ATK|ARMOR|CHARGE|COST|DAMAGE|EXHAUSTED|FROZEN|HEALTH|TAUNT|SILENCED) value=(?P<tag_value>.*)`)},
+			`TAG_CHANGE .*id=(?P<instance_id>\d+).*tag=(?P<tag_name>ATK|ARMOR|CHARGE|COST|DAMAGE|EXHAUSTED|FROZEN|HEALTH|TAUNT|SILENCED) value=(?P<tag_value>.*?)\r?$`)},
 		//LineParser{applyDebugWriteLine, regexp.MustCompile(`\[Zone\] ZoneChangeList.ProcessChanges\(\) -\s+` +
 		//  `id=.* local=.* \[name=(?P<name>.*) id=(?P<instanceId>.*) zone=.* zonePos=.* cardId=(?P<class_id>.*) player=(?P<player_id>.*)\] zone from (?P<zome_from>.*) -> (?P<zome_to>.*)`)},
 		LineParser{applyZoneChange, regexp.MustCompile(`\[Zone\] ZoneChangeList.ProcessChanges\(\) -\s+` +
-			`TRANSITIONING card \[name=(?P<name>.*) id=(?P<instance_id>.*) zone=.* zonePos=.* cardId=(?P<class_id>.*) player=(?P<player_id>.*)\] to (?P<zone_to>.*)$`)},
+			`TRANSITIONING card \[name=(?P<name>.*) id=(?P<instance_id>.*) zone=.* zonePos=.* cardId=(?P<class_id>.*) player=(?P<player_id>.*)\] to (?P<zone_to>.*?)\r?$`)},
 		//LineParser{regexp.MustCompile(`\[Power\] .*`), applyDebugWriteLine},
 	}
 )
