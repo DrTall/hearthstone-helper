@@ -176,6 +176,9 @@ func attack(gs *GameState, params *MoveParams) {
 }
 
 func (gs *GameState) dealDamage(target *Card, amount int32) {
+	if amount <= 0 {
+		return
+	}
 	target.Damage += amount
 
 	// We're not bad people, but we did a bad thing...
@@ -200,7 +203,7 @@ func (gs *GameState) dealDamage(target *Card, amount int32) {
 }
 
 func minionNeedsKilling(card *Card) bool {
-	return card.PendingDestroy || card.Damage > card.Health
+	return card.PendingDestroy || card.Damage >= card.Health
 }
 
 // Clean up the gs state, moving cards to their zones, executing deathrattles, etc

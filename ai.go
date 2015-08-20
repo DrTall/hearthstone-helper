@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -18,6 +19,42 @@ type DecisionTreeNode struct {
 	Gs                 *GameState
 	Moves              []*MoveParams
 	SuccessProbability float32
+}
+
+func getPrettyCardDesc(card *Card, careAboutCost bool) string {
+	changes := make([]string, 0)
+
+	jsonCard := GlobalCardJsonData[card.JsonCardId]
+	switch card.Type {
+	case "Minion":
+		if jsonCard.Health != card.Health || jsonCard.Attack != card.Attack || card.Damage != 0 {
+			life := card.Health - card.Damage
+			changes = append(changes, fmt.Sprintf("now a %v/%v", card.Attack, life))
+		}
+	case "Hero":
+		if card.Damage != 0 || card.Armor != 0 {
+			life := card.Health - card.Damage
+			if card.Armor != 0 {
+				changes = append(changes, fmt.Sprintf("at %v life with %v armor", life, card.Armor))
+			} else {
+				changes = append(changes, fmt.Sprintf("at %v life", life))
+			}
+		}
+	}
+	if careAboutCost {
+		if jsonCard.Cost > card.Cost {
+			changes = append(changes, fmt.Sprintf("cost reduced to %v", card.Cost))
+		} else if jsonCard.Cost < card.Cost {
+			changes = append(changes, fmt.Sprintf("cost increased to %v", card.Cost))
+		}
+	}
+	if card.Charge {
+		changes = append(changes, "with charge")
+	}
+	if len(changes) > 0 {
+		return fmt.Sprintf("%v (%v)", card.Name, strings.Join(changes, " "))
+	}
+	return card.Name
 }
 
 // Hack around the fact that you have to iterate to get a map key.
@@ -98,12 +135,12 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 				continue
 			}
 			// Attack minion
-			desc := fmt.Sprintf("%v attacks %v", friendlyMinion.Name, enemyMinion.Name)
+			desc := fmt.Sprintf("%v attacks %v", getPrettyCardDesc(friendlyMinion, false), getPrettyCardDesc(enemyMinion, false))
 			workChan <- generateNode(node, &MoveParams{CardOne: friendlyMinion, CardTwo: enemyMinion, Description: desc})
 		}
 		if !enemyTauntExists {
 			// Attack face
-			desc := fmt.Sprintf("%v attacks face (%v)", friendlyMinion.Name, enemyHero.Name)
+			desc := fmt.Sprintf("%v attacks face (%v)", getPrettyCardDesc(friendlyMinion, false), getPrettyCardDesc(enemyHero, false))
 			workChan <- generateNode(node, &MoveParams{CardOne: friendlyMinion, CardTwo: enemyHero, Description: desc})
 		}
 	}
@@ -113,15 +150,15 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 		for enemyMinion := range node.Gs.CardsByZone["OPPOSING PLAY"] {
 			if enemyTauntExists && !enemyMinion.Taunt {
 				// This minion can't be attacked.
-				//fmt.Printf("DEBUG: %v is protected by a taunt minion.\n", enemyMinion.Name)
+				//fmt.Printf("DEBUG: %v is protected by a taunt minion.\n", getPrettyCardDesc(enemyMinion)
 				continue
 			}
-			desc := fmt.Sprintf("You (%v) attack %v", friendlyHero.Name, enemyMinion.Name)
+			desc := fmt.Sprintf("You (%v) attack %v", getPrettyCardDesc(friendlyHero, false), getPrettyCardDesc(enemyMinion, false))
 			workChan <- generateNode(node, &MoveParams{CardOne: friendlyHero, CardTwo: enemyMinion, Description: desc})
 		}
 		if !enemyTauntExists {
 			// Attack face
-			desc := fmt.Sprintf("You (%v) attack face (%v)", friendlyHero.Name, enemyHero.Name)
+			desc := fmt.Sprintf("You (%v) attack face (%v)", getPrettyCardDesc(friendlyHero, false), getPrettyCardDesc(enemyHero, false))
 			workChan <- generateNode(node, &MoveParams{CardOne: friendlyHero, CardTwo: enemyHero, Description: desc})
 		}
 	}
@@ -131,21 +168,21 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 	for cardInHand := range node.Gs.CardsByZone["FRIENDLY HAND"] {
 		if cardInHand.Cost > node.Gs.Mana {
 			// Too expensive.
-			//fmt.Printf("DEBUG: %v is too expensive to play.\n", cardInHand.Name)
+			//fmt.Printf("DEBUG: %v is too expensive to play.\n", getPrettyCardDesc(cardInHand)
 			continue
 		}
 		var descPrefix string
 		switch cardInHand.Type {
 		case "Spell":
-			descPrefix = fmt.Sprintf("Cast %v", cardInHand.Name)
+			descPrefix = fmt.Sprintf("Cast %v", getPrettyCardDesc(cardInHand, true))
 		case "Weapon":
-			descPrefix = fmt.Sprintf("Equip %v", cardInHand.Name)
+			descPrefix = fmt.Sprintf("Equip %v", getPrettyCardDesc(cardInHand, true))
 		case "Minion":
 			if numFriendlyMinions >= 7 {
-				//fmt.Printf("DEBUG: No space on the board to play %v.\n", cardInHand.Name)
+				//fmt.Printf("DEBUG: No space on the board to play %v.\n", getPrettyCardDesc(cardInHand)
 				continue
 			}
-			descPrefix = fmt.Sprintf("Play %v", cardInHand.Name)
+			descPrefix = fmt.Sprintf("Play %v", getPrettyCardDesc(cardInHand, true))
 		}
 		filter := getPlayCardTargetFilter(cardInHand)
 		if filter(nil) {
@@ -155,16 +192,16 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 			for _, target := range node.Gs.CardsById {
 				if filter(target) {
 					couldTargetAny = true
-					desc := fmt.Sprintf("%v on %v", descPrefix, target.Name)
+					desc := fmt.Sprintf("%v on %v", descPrefix, getPrettyCardDesc(target, false))
 					workChan <- generateNode(node, &MoveParams{CardOne: cardInHand, CardTwo: target, Description: desc})
 				}
 			}
 			if !couldTargetAny {
 				if cardInHand.Type == "Minion" {
-					//fmt.Printf("DEBUG: Allowing %v to be played without a target since none exist.\n", cardInHand.Name)
+					//fmt.Printf("DEBUG: Allowing %v to be played without a target since none exist.\n", getPrettyCardDesc(cardInHand)
 					workChan <- generateNode(node, &MoveParams{CardOne: cardInHand, CardTwo: nil, Description: descPrefix})
 				} else {
-					//fmt.Printf("DEBUG: No valid targets for %v.\n", cardInHand.Name)
+					//fmt.Printf("DEBUG: No valid targets for %v.\n", getPrettyCardDesc(cardInHand)
 				}
 			}
 		}
