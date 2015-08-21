@@ -120,6 +120,9 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 		return
 	}
 	enemyHero := getSingletonFromZone(node.Gs, "OPPOSING PLAY (Hero)", true)
+	if enemyHero == nil {
+		return
+	}
 	enemyTauntExists := false
 	for enemyMinion := range node.Gs.CardsByZone["OPPOSING PLAY"] {
 		if enemyMinion.Taunt {
