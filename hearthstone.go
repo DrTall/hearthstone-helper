@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/ActiveState/tail"
+	"strings"
 	"time"
 )
 
@@ -35,12 +36,20 @@ func main() {
 	gs := GameState{}
 	gs.resetGameState()
 	solutionChan := make(chan *DecisionTreeNode)
+	seenUsername := false
 	var deepestSolution, shortestSolution *DecisionTreeNode
 	var abortChan *chan time.Time
 	for {
 		select {
 		case line := <-log.Lines:
+			if !seenUsername && strings.Contains(line.Text, *hsUsername) {
+				seenUsername = true
+			}
 			if turnStart, somethingHappened := ParseHearthstoneLogLine(line.Text, &gs); turnStart || somethingHappened {
+				if !seenUsername {
+					fmt.Println("WARN: Waiting to see --username before looking for solutions.")
+					continue
+				}
 				//fmt.Println("It is the start of turn for:", gs.LastManaAdjustPlayer)
 				if abortChan != nil {
 					*abortChan <- time.Now()
