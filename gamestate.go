@@ -310,8 +310,29 @@ type CardInfo struct {
 }
 
 func (c *Card) getInfo() CardInfo {
-	return CardInfo{
+	return CardInfo {
 		JsonCardId:         c.JsonCardId,
+		Type:               c.Type,
+		Name:               c.Name,
+		Cost:               c.Cost,
+		Attack:             c.Attack,
+		Health:             c.Health,
+		Armor:              c.Armor,
+		Damage:             c.Damage,
+		NumAttacksThisTurn: c.NumAttacksThisTurn,
+		Charge:             c.Charge,
+		Exhausted:          c.Exhausted,
+		Frozen:             c.Frozen,
+		Taunt:              c.Taunt,
+		Silenced:           c.Silenced,
+		Zone:               c.Zone,
+		PendingDestroy:     c.PendingDestroy,
+	}
+}
+
+// for enemy minions, we don't care about JsonCardId.
+func (c *Card) getInfoAsEnemyMinion() CardInfo {
+	return CardInfo {
 		Type:               c.Type,
 		Name:               c.Name,
 		Cost:               c.Cost,

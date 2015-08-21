@@ -112,7 +112,18 @@ func uniqueCardsInZone(gs *GameState, zone string) map[CardInfo]*Card {
 	for minion := range allMinions {
 		uniqueMinionInfo[minion.getInfo()] = minion
 	}
-	diff := len(allMinions) - len(uniqueMinionInfo)
+	return uniqueMinionInfo
+}
+
+// Returns a map of "unique" CardInfo -> one instance of Card with that CardInfo
+// for the zone "OPPOSING PLAY", where we don't care about certain attributes of the card.
+func uniqueCardsInOpposingPlay(gs *GameState) map[CardInfo]*Card {
+    zone := "OPPOSING PLAY"
+	allMinions := gs.CardsByZone[zone]
+	uniqueMinionInfo := make(map[CardInfo]*Card)
+	for minion := range allMinions {
+		uniqueMinionInfo[minion.getInfoAsEnemyMinion()] = minion
+	}
 	return uniqueMinionInfo
 }
 
@@ -149,7 +160,7 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 			//fmt.Printf("DEBUG: %v is in play but can't attack for some reason.\n", friendlyMinion.Name)
 			continue
 		}
-		for _, enemyMinion := range uniqueCardsInZone(node.Gs, "OPPOSING PLAY") {
+		for _, enemyMinion := range uniqueCardsInOpposingPlay(node.Gs) {
 			if enemyTauntExists && !enemyMinion.Taunt {
 				// This minion can't be attacked.
 				//fmt.Printf("DEBUG: %v is protected by a taunt minion.\n", enemyMinion.Name)
@@ -168,7 +179,7 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 
 	// Hero can attack minions or face with a weapon.
 	if canCardAttack(friendlyHero) {
-		for _, enemyMinion := range uniqueCardsInZone(node.Gs, "OPPOSING PLAY") {
+		for _, enemyMinion := range uniqueCardsInOpposingPlay(node.Gs) {
 			if enemyTauntExists && !enemyMinion.Taunt {
 				// This minion can't be attacked.
 				//fmt.Printf("DEBUG: %v is protected by a taunt minion.\n", getPrettyCardDesc(enemyMinion)
@@ -187,7 +198,7 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 	// Spells, Minions, and Weapons can be played including targets maybe.
 	numFriendlyMinions := len(node.Gs.CardsByZone["FRIENDLY PLAY"])
 	availableMana := node.Gs.ManaMax - node.Gs.ManaUsed + node.Gs.ManaTemp
-	for cardInHand := range node.Gs.CardsByZone["FRIENDLY HAND"] {
+	for _, cardInHand := range uniqueCardsInZone(node.Gs, "FRIENDLY HAND") {
 		if cardInHand.Cost > availableMana {
 			// Too expensive.
 			//fmt.Printf("DEBUG: %v is too expensive to play.\n", getPrettyCardDesc(cardInHand)
