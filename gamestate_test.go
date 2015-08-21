@@ -5,9 +5,18 @@ import (
 	"testing"
 )
 
-func TestDeepCopy(t *testing.T) {
+func createEmptyGameState() GameState {
 	gs := GameState{}
 	gs.resetGameState()
+    hero1 := gs.getOrCreateCard("HERO_01", 1)
+    hero2 := gs.getOrCreateCard("HERO_01", 2)
+    gs.moveCard(hero1, "FRIENDLY PLAY (Hero)")
+    gs.moveCard(hero2, "OPPOSING PLAY (Hero)")
+    return gs
+}
+
+func TestDeepCopy(t *testing.T) {
+	gs := createEmptyGameState()
 	c := gs.getOrCreateCard("GVG_112", 42)
 	gs.moveCard(c, "MY_ZONE")
 	c.Health = 2 // Mutate c so we know that it is getting copied.
@@ -38,8 +47,7 @@ func TestDeepCopy(t *testing.T) {
 }
 
 func TestMove(t *testing.T) {
-	gs := GameState{}
-	gs.resetGameState()
+	gs := createEmptyGameState()
 	c := gs.getOrCreateCard("GVG_112", 42)
 	gs.moveCard(c, "FRIENDLY HAND")
 
@@ -67,8 +75,7 @@ func TestMove(t *testing.T) {
 
 func TestBattlecry(t *testing.T) {
 	fmt.Println("---- TestBattlecry starting")
-	gs := GameState{}
-	gs.resetGameState()
+	gs := createEmptyGameState()
 	c := gs.getOrCreateCard("EX1_603", 42)
 	murloc := gs.getOrCreateCard("EX1_506", 43)
 	gs.moveCard(c, "FRIENDLY HAND")
@@ -97,4 +104,38 @@ func TestBattlecry(t *testing.T) {
 	if murloc.Zone != "FRIENDLY GRAVEYARD" {
 		t.Error()
 	}
+}
+
+func TestDedup(t *testing.T) {
+	fmt.Println("---- TestDedup starting")
+	gs := createEmptyGameState()
+	c1 := gs.getOrCreateCard("EX1_603", 42)
+	c2 := gs.getOrCreateCard("EX1_603", 43)
+	murlocScout := gs.getOrCreateCard("EX1_506a", 44)
+	murlocScout2 := gs.getOrCreateCard("EX1_506a", 45)
+
+	gs.moveCard(c1, "FRIENDLY PLAY")
+	gs.moveCard(c2, "FRIENDLY PLAY")
+	gs.moveCard(murlocScout, "OPPOSING PLAY")
+	gs.moveCard(murlocScout2, "OPPOSING PLAY")
+
+	if len(uniqueCardsInZone(&gs, "FRIENDLY PLAY")) != 1 {
+		t.Error()
+	}
+
+	// Deal damage to c1, so they have different amounts of damage
+	gs.dealDamage(c1, 1)
+	if len(uniqueCardsInZone(&gs, "FRIENDLY PLAY")) != 2 {
+		t.Error()
+	}
+
+    if len(uniqueCardsInZone(&gs, "OPPOSING PLAY")) != 1 {
+        t.Error()
+    }
+
+    murlocScout.Frozen = true
+    if len(uniqueCardsInZone(&gs, "OPPOSING PLAY")) != 2 {
+        t.Error()
+    }
+
 }

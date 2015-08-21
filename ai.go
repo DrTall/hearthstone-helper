@@ -105,6 +105,17 @@ func generateNode(node *DecisionTreeNode, move *MoveParams) *DecisionTreeNode {
 	}
 }
 
+// Returns a map of "unique" CardInfo -> one instance of Card with that CardInfo
+func uniqueCardsInZone(gs *GameState, zone string) map[CardInfo]*Card {
+	allMinions := gs.CardsByZone[zone]
+	uniqueMinionInfo := make(map[CardInfo]*Card)
+	for minion := range allMinions {
+		uniqueMinionInfo[minion.getInfo()] = minion
+	}
+	diff := len(allMinions) - len(uniqueMinionInfo)
+	return uniqueMinionInfo
+}
+
 func canCardAttack(card *Card) bool {
 	return !(card.NumAttacksThisTurn > 0 || (card.Exhausted && !card.Charge) || card.Frozen || card.Attack == 0)
 }
@@ -132,13 +143,13 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 	}
 
 	// Minions can attack minions or face.
-	for friendlyMinion := range node.Gs.CardsByZone["FRIENDLY PLAY"] {
+	for _, friendlyMinion := range uniqueCardsInZone(node.Gs, "FRIENDLY PLAY") {
 		if !canCardAttack(friendlyMinion) {
 			// This minion can't attack.
 			//fmt.Printf("DEBUG: %v is in play but can't attack for some reason.\n", friendlyMinion.Name)
 			continue
 		}
-		for enemyMinion := range node.Gs.CardsByZone["OPPOSING PLAY"] {
+		for _, enemyMinion := range uniqueCardsInZone(node.Gs, "OPPOSING PLAY") {
 			if enemyTauntExists && !enemyMinion.Taunt {
 				// This minion can't be attacked.
 				//fmt.Printf("DEBUG: %v is protected by a taunt minion.\n", enemyMinion.Name)
@@ -157,7 +168,7 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 
 	// Hero can attack minions or face with a weapon.
 	if canCardAttack(friendlyHero) {
-		for enemyMinion := range node.Gs.CardsByZone["OPPOSING PLAY"] {
+		for _, enemyMinion := range uniqueCardsInZone(node.Gs, "OPPOSING PLAY") {
 			if enemyTauntExists && !enemyMinion.Taunt {
 				// This minion can't be attacked.
 				//fmt.Printf("DEBUG: %v is protected by a taunt minion.\n", getPrettyCardDesc(enemyMinion)

@@ -285,3 +285,47 @@ type Card struct {
 	Zone               string
 	PendingDestroy     bool // Internal. Should this minion be destroyed in the next cleanup step?
 }
+
+// TODO (dz): this is kinda hacky... Card should really be a struct with just InstanceId + CardInfo,
+// but I'm too lazy to change it for now.
+// An internal class representing the aspects of a Card that matter to the game
+// (everything besides the InstanceId)
+type CardInfo struct {
+	JsonCardId         string // Refers to JsonCardData.Id
+	Type               string // Refers to JsonCardData.Type
+	Name               string // Refers to JsonCardData.Name
+	Cost               int32
+	Attack             int32
+	Health             int32
+	Armor              int32
+	Damage             int32
+	NumAttacksThisTurn int32
+	Charge             bool
+	Exhausted          bool
+	Frozen             bool
+	Taunt              bool
+	Silenced           bool
+	Zone               string
+	PendingDestroy     bool // Internal. Should this minion be destroyed in the next cleanup step?
+}
+
+func (c *Card) getInfo() CardInfo {
+	return CardInfo{
+		JsonCardId:         c.JsonCardId,
+		Type:               c.Type,
+		Name:               c.Name,
+		Cost:               c.Cost,
+		Attack:             c.Attack,
+		Health:             c.Health,
+		Armor:              c.Armor,
+		Damage:             c.Damage,
+		NumAttacksThisTurn: c.NumAttacksThisTurn,
+		Charge:             c.Charge,
+		Exhausted:          c.Exhausted,
+		Frozen:             c.Frozen,
+		Taunt:              c.Taunt,
+		Silenced:           c.Silenced,
+		Zone:               c.Zone,
+		PendingDestroy:     c.PendingDestroy,
+	}
+}
