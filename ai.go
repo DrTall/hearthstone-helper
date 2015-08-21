@@ -221,7 +221,7 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 
 func WalkDecisionTree(gs *GameState, solutionChan chan<- *DecisionTreeNode, abortChan chan time.Time) {
 	unsortedWorkChan, lowPriWorkChan := make(chan *DecisionTreeNode, 1000000), make(chan *DecisionTreeNode, 1000000)
-	softTimeoutChan := time.After(time.Second * 70)
+	softTimeout1Chan, softTimeout2Chan, softTimeout3Chan := time.After(time.Second*30), time.After(time.Second*50), time.After(time.Second*70)
 	timeoutChan := time.After(time.Second * 300)
 	var totalNodes, maxDepth int
 	var deepestNode *DecisionTreeNode
@@ -255,8 +255,12 @@ func WalkDecisionTree(gs *GameState, solutionChan chan<- *DecisionTreeNode, abor
 		case <-timeoutChan:
 			fmt.Println("DEBUG: Decision tree walk timing out...")
 			return
-		case <-softTimeoutChan:
-			fmt.Println("WARN: It's been 70 seconds now.")
+		case <-softTimeout1Chan:
+			fmt.Println("WARN: Turn ends in 40 seconds.")
+		case <-softTimeout2Chan:
+			fmt.Println("WARN: Turn ends in 20 seconds.")
+		case <-softTimeout3Chan:
+			fmt.Println("WARN: Turn ended.")
 		case node := <-unsortedWorkChan:
 			if totalNodes == 0 {
 				fmt.Println("DEBUG: Beginning decision tree walk.")

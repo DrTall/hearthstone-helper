@@ -167,10 +167,12 @@ func runCardPlayedAction(gs *GameState, params *MoveParams) {
 
 // Run the action out of GlobalDeathrattleActions for a given card.
 func runDeathrattleAction(gs *GameState, dyingMinion *Card) {
-	getDeathrattleAction(dyingMinion)(gs, &MoveParams{
-		CardOne:     dyingMinion,
-		Description: "Dummy move param for deathrattle",
-	})
+	if !dyingMinion.Silenced {
+		getDeathrattleAction(dyingMinion)(gs, &MoveParams{
+			CardOne:     dyingMinion,
+			Description: "Dummy move param for deathrattle",
+		})
+	}
 }
 
 func (gs *GameState) CreateNewMinion(jsonId string, zone string) *Card {
