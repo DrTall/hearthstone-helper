@@ -5,6 +5,8 @@ type PruningOpts struct {
 	getCardsFromFriendlyZone func(gs *GameState, zone string) []*Card
 	getCardsInOpposingPlay   func(gs *GameState) []*Card
 	isNodeHighPriority       func(node *DecisionTreeNode) bool
+	// Whether to optimize The Coin (you basically always should)
+	useCoinOptimization bool
 }
 
 var GlobalPruningOpts PruningOpts
@@ -14,6 +16,7 @@ func resetGlobalPruningOpts() {
 		getCardsFromFriendlyZone: uniqueCardsInZone,
 		getCardsInOpposingPlay:   uniqueCardsInOpposingPlay,
 		isNodeHighPriority:       isFrothingBerserkerReady,
+		useCoinOptimization:      true,
 	}
 }
 

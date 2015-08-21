@@ -176,7 +176,26 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 	// Spells, Minions, and Weapons can be played including targets maybe.
 	numFriendlyMinions := len(node.Gs.CardsByZone["FRIENDLY PLAY"])
 	availableMana := node.Gs.ManaMax - node.Gs.ManaUsed + node.Gs.ManaTemp
-	for _, cardInHand := range GlobalPruningOpts.getCardsFromFriendlyZone(node.Gs, "FRIENDLY HAND") {
+    cardsInHand := GlobalPruningOpts.getCardsFromFriendlyZone(node.Gs, "FRIENDLY HAND")
+    // The Coin optimization
+    // If any card in hand is The Coin, we play it as soon as it would be useful, and then return so that all
+    // children do not have The Coin in the hand any more.
+    if GlobalPruningOpts.useCoinOptimization {
+        var theCoin *Card
+        for _, cardInHand := range cardsInHand {
+            if cardInHand.JsonCardId == "GAME_005" {
+                theCoin = cardInHand
+            }
+        }
+        if theCoin != nil {
+            if node.Gs.ManaMax < 10 || node.Gs.ManaUsed > 0 {
+                descPrefix := fmt.Sprintf("Cast %v", getPrettyCardDesc(theCoin, true))
+                workChan <- generateNode(node, &MoveParams{CardOne: theCoin, CardTwo: nil, Description: descPrefix})
+            }
+            return
+        }
+    }
+	for _, cardInHand := range cardsInHand {
 		if cardInHand.Cost > availableMana {
 			// Too expensive.
 			//fmt.Printf("DEBUG: %v is too expensive to play.\n", getPrettyCardDesc(cardInHand)
