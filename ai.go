@@ -235,10 +235,12 @@ func WalkDecisionTree(gs *GameState, solutionChan chan<- *DecisionTreeNode, abor
 	var deepestNode *DecisionTreeNode
 	anySolution := false
 	defer func() {
-		fmt.Printf("INFO: WalkDecisionTree exited after considering %v nodes with maxDepth %v.\n", totalNodes, maxDepth)
-		if !anySolution && totalNodes > 0 {
-			fmt.Println("Sorry you didn't win. Here is the deepest node discovered:")
-			prettyPrintDecisionTreeNode(deepestNode)
+		if deepestNode != nil {
+			fmt.Printf("INFO: WalkDecisionTree exited after considering %v nodes with maxDepth %v.\n", totalNodes, maxDepth)
+			if !anySolution {
+				fmt.Println("Sorry you didn't win. Here is the deepest node discovered:")
+				prettyPrintDecisionTreeNode(deepestNode)
+			}
 		}
 	}()
 	for {

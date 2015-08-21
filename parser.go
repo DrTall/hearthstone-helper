@@ -66,39 +66,17 @@ type LineParserApplyArgs struct {
 }
 
 func applyDebugWriteLine(args *LineParserApplyArgs) {
-	if len(args.match) > 0 {
+	/*if len(args.match) > 0 {
 		prettyPrint(args.match)
 	} else {
 		fmt.Println("DEBUG:", args.line)
-	}
+	}*/
 }
 
 func applyNewGame(args *LineParserApplyArgs) {
 	args.gs.resetGameState()
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
+	fmt.Println("INFO: New Game")
 	applyDebugWriteLine(args)
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
-	fmt.Println("~~~~~~~~~~~~~~~~")
 }
 
 func applyCreatePlayer(args *LineParserApplyArgs) {
@@ -110,7 +88,7 @@ func applyZoneChange(args *LineParserApplyArgs) {
 	instance_id, _ := strconv.ParseInt(args.match["instance_id"], 10, 32)
 	card := args.gs.getOrCreateCard(args.match["class_id"], int32(instance_id))
 	args.gs.moveCard(card, args.match["zone_to"])
-	prettyPrint(*card)
+	//prettyPrint(*card)
 }
 
 func applyTagChange(args *LineParserApplyArgs) {
@@ -146,7 +124,7 @@ func applyTagChange(args *LineParserApplyArgs) {
 	default:
 		fmt.Println("ERROR: Unknown tag_name:", args.match["tag_name"])
 	}
-	prettyPrint(*card)
+	//prettyPrint(*card)
 }
 
 func applyTagChangeNoJsonId(args *LineParserApplyArgs) {
@@ -156,8 +134,8 @@ func applyTagChangeNoJsonId(args *LineParserApplyArgs) {
 		// the json id.
 		applyTagChange(args)
 	} else {
-		fmt.Println("ERROR: Got a tag change for instance_id before "+
-			"it was given a json class:", instance_id)
+		/*fmt.Println("ERROR: Got a tag change for instance_id before "+
+		"it was given a json class:", instance_id)*/
 	}
 }
 

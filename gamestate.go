@@ -126,7 +126,7 @@ func useCard(gs *GameState, params *MoveParams) {
 		case "Weapon":
 			// remove anything currently in weapon zone
 			friendlyHero := getSingletonFromZone(gs, "FRIENDLY PLAY (Hero)", true)
-			prettyPrint(friendlyHero)
+			//prettyPrint(friendlyHero)
 			if oldWeapon := getSingletonFromZone(gs, "FRIENDLY PLAY (Weapon)", false); oldWeapon != nil {
 				// Yes, really destroy the weapon now: http://hearthstone.gamepedia.com/Advanced_rulebook#Instant_weapon_destruction
 				gs.handleDeath(oldWeapon)
@@ -200,16 +200,18 @@ func (gs *GameState) dealDamage(target *Card, amount int32) {
 		//fmt.Println("DEBUG: Everyone! Get in here!")
 		gs.CreateNewMinion("BRM_019", target.Zone)
 	}
-	for friendlyMinion := range gs.CardsByZone["FRIENDLY PLAY"] {
-		if friendlyMinion.JsonCardId == "EX1_604" && !friendlyMinion.Silenced { // Frothing Berserker
-			//fmt.Println("DEBUG: My blade be thirsty!")
-			friendlyMinion.Attack += 1
+	if target.Type == "Minion" {
+		for friendlyMinion := range gs.CardsByZone["FRIENDLY PLAY"] {
+			if friendlyMinion.JsonCardId == "EX1_604" && !friendlyMinion.Silenced { // Frothing Berserker
+				//fmt.Println("DEBUG: My blade be thirsty!")
+				friendlyMinion.Attack += 1
+			}
 		}
-	}
-	for enemyMinion := range gs.CardsByZone["OPPOSING PLAY"] {
-		if enemyMinion.JsonCardId == "EX1_604" && !enemyMinion.Silenced { // Frothing Berserker
-			//fmt.Println("DEBUG: Enemy Frothing Berserker triggered.")
-			enemyMinion.Attack += 1
+		for enemyMinion := range gs.CardsByZone["OPPOSING PLAY"] {
+			if enemyMinion.JsonCardId == "EX1_604" && !enemyMinion.Silenced { // Frothing Berserker
+				//fmt.Println("DEBUG: Enemy Frothing Berserker triggered.")
+				enemyMinion.Attack += 1
+			}
 		}
 	}
 }

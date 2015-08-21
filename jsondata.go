@@ -36,7 +36,7 @@ func newCardFromJson(jsonCardId string, instanceId int32) Card {
 			case "Taunt":
 				result.Taunt = true
 			default:
-				fmt.Printf("WARN: Unknown json card mechanic %v\n", mechanic)
+				//fmt.Printf("WARN: Unknown json card mechanic %v\n", mechanic)
 			}
 		}
 		return result
