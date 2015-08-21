@@ -14,32 +14,59 @@ func getAllCardsInZone(gs *GameState, zone string) []*Card {
 	return result
 }
 
-func SetupNoPruning() {
+func SetupNaive() {
 	GlobalPruningOpts = PruningOpts{
 		getCardsFromFriendlyZone: getAllCardsInZone,
 		getCardsInOpposingPlay:   func(gs *GameState) []*Card { return getAllCardsInZone(gs, "OPPOSING PLAY") },
+		isNodeHighPriority:       func(node *DecisionTreeNode) bool { return true },
 	}
 }
 
-func BenchmarkAllToFaceNoPruning(t *testing.B) {
+func SetupNoPruningWithPriority() {
 	resetGlobalPruningOpts()
-	SetupNoPruning()
+	GlobalPruningOpts = PruningOpts{
+		getCardsFromFriendlyZone: getAllCardsInZone,
+		getCardsInOpposingPlay:   func(gs *GameState) []*Card { return getAllCardsInZone(gs, "OPPOSING PLAY") },
+		isNodeHighPriority:       GlobalPruningOpts.isNodeHighPriority,
+	}
+}
+
+func SetupPruningWithoutPriority() {
+	resetGlobalPruningOpts()
+	GlobalPruningOpts = PruningOpts{
+		getCardsFromFriendlyZone: GlobalPruningOpts.getCardsFromFriendlyZone,
+		getCardsInOpposingPlay:   GlobalPruningOpts.getCardsInOpposingPlay,
+		isNodeHighPriority:       func(node *DecisionTreeNode) bool { return true },
+	}
+}
+
+func BenchmarkAllToFaceAllOptimizations(t *testing.B) {
+	resetGlobalPruningOpts()
 	AllToFaceTest()
 }
 
-func BenchmarkAllToFace(t *testing.B) {
-	resetGlobalPruningOpts()
+func BenchmarkAllToFaceNaive(t *testing.B) {
+	SetupNaive()
 	AllToFaceTest()
 }
 
-func BenchmarkComboInHand(t *testing.B) {
+func BenchmarkComboInHandAllOptimizations(t *testing.B) {
 	resetGlobalPruningOpts()
 	ComboInHandTest()
 }
 
-func BenchmarkComboInHandNoPruning(t *testing.B) {
-	resetGlobalPruningOpts()
-	SetupNoPruning()
+func BenchmarkComboInHandNoPruningWithPriority(t *testing.B) {
+	SetupNoPruningWithPriority()
+	ComboInHandTest()
+}
+
+func BenchmarkComboInHandPruningWithoutPriority(t *testing.B) {
+	SetupPruningWithoutPriority()
+	ComboInHandTest()
+}
+
+func BenchmarkComboInHandNaive(t *testing.B) {
+	SetupNaive()
 	ComboInHandTest()
 }
 

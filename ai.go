@@ -105,57 +105,8 @@ func generateNode(node *DecisionTreeNode, move *MoveParams) *DecisionTreeNode {
 	}
 }
 
-// Returns a slices of "unique" *Cards, per CardInfo
-func uniqueCardsInZone(gs *GameState, zone string) []*Card {
-	result := make([]*Card, 0)
-	allMinions := gs.CardsByZone[zone]
-	uniqueMinionInfo := make(map[CardInfo]*Card)
-	for minion := range allMinions {
-		if _, exists := uniqueMinionInfo[minion.getInfo()]; !exists {
-			result = append(result, minion)
-			uniqueMinionInfo[minion.getInfo()] = minion
-		}
-	}
-	return result
-}
-
-// Returns a slices of "unique" *Cards, per CardInfo for the zone
-// "OPPOSING PLAY", where we don't care about certain attributes of the card.
-func uniqueCardsInOpposingPlay(gs *GameState) []*Card {
-	result := make([]*Card, 0)
-	zone := "OPPOSING PLAY"
-	allMinions := gs.CardsByZone[zone]
-	uniqueMinionInfo := make(map[CardInfo]*Card)
-	for minion := range allMinions {
-		if _, exists := uniqueMinionInfo[minion.getInfoAsEnemyMinion()]; !exists {
-			result = append(result, minion)
-			uniqueMinionInfo[minion.getInfoAsEnemyMinion()] = minion
-		}
-	}
-	return result
-}
-
 func canCardAttack(card *Card) bool {
 	return !(card.NumAttacksThisTurn > 0 || (card.Exhausted && !card.Charge) || card.Frozen || card.Attack == 0)
-}
-
-// Options for benchmarking.
-type PruningOpts struct {
-	getCardsFromFriendlyZone func(gs *GameState, zone string) []*Card
-	getCardsInOpposingPlay   func(gs *GameState) []*Card
-}
-
-var GlobalPruningOpts PruningOpts
-
-func resetGlobalPruningOpts() {
-	GlobalPruningOpts = PruningOpts{
-		getCardsFromFriendlyZone: uniqueCardsInZone,
-		getCardsInOpposingPlay:   uniqueCardsInOpposingPlay,
-	}
-}
-
-func init() {
-	resetGlobalPruningOpts()
 }
 
 // Enumerate all of the possible next moves from the given GameState.
@@ -268,24 +219,25 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 	}
 }
 
-func WalkDecisionTree(gs *GameState, solutionChan chan<- *DecisionTreeNode, abortChan <-chan time.Time) {
-	workChan := make(chan *DecisionTreeNode, 1000000)
+func WalkDecisionTree(gs *GameState, solutionChan chan<- *DecisionTreeNode, abortChan chan time.Time) {
+	unsortedWorkChan, lowPriWorkChan := make(chan *DecisionTreeNode, 1000000), make(chan *DecisionTreeNode, 1000000)
 	softTimeoutChan := time.After(time.Second * 70)
 	timeoutChan := time.After(time.Second * 300)
+	var totalNodes, maxDepth int
+	var deepestNode *DecisionTreeNode
+	anySolution := false
 
 	// Sleep briefly before kicking off the work, since it will get cancelled
 	// very quickly in turns where the human operator knows there's no hope.
 	go func() {
-		time.Sleep(time.Second)
-		workChan <- &DecisionTreeNode{
+		//time.Sleep(time.Second)
+		unsortedWorkChan <- &DecisionTreeNode{
 			Gs:                 gs,
 			Moves:              make([]*MoveParams, 0),
 			SuccessProbability: 1.0,
 		}
 	}()
-	var totalNodes, maxDepth int
-	var deepestNode *DecisionTreeNode
-	anySolution := false
+
 	defer func() {
 		if deepestNode != nil {
 			fmt.Printf("INFO: WalkDecisionTree exited after considering %v nodes with maxDepth %v.\n", totalNodes, maxDepth)
@@ -305,7 +257,7 @@ func WalkDecisionTree(gs *GameState, solutionChan chan<- *DecisionTreeNode, abor
 			return
 		case <-softTimeoutChan:
 			fmt.Println("WARN: It's been 70 seconds now.")
-		case node := <-workChan:
+		case node := <-unsortedWorkChan:
 			if totalNodes == 0 {
 				fmt.Println("DEBUG: Beginning decision tree walk.")
 			}
@@ -319,29 +271,29 @@ func WalkDecisionTree(gs *GameState, solutionChan chan<- *DecisionTreeNode, abor
 				maxDepth = depth
 				deepestNode = node
 			}
-			//fmt.Printf("DEBUG: Working on a new node. It is %v levels deep.\n", len(node.Moves))
-			/*if len(node.Moves) > 100 {
-			  out := ""
-			  for _, move := range node.Moves {
-			    out += move.Description + "~"
-			  }
-			  fmt.Printf("FATAL: %v", out)
-			  return
-			}*/
 			switch node.Gs.Winner {
 			case FRIENDLY_VICTORY:
 				anySolution = true
 				solutionChan <- node
 			case NO_VICTORY:
-				go generateNextNodes(node, workChan)
+				if GlobalPruningOpts.isNodeHighPriority(node) {
+					go generateNextNodes(node, unsortedWorkChan)
+				} else {
+					go func() { lowPriWorkChan <- node }()
+				}
 			case OPPOSING_VICTORY_OR_DRAW:
 				// Do nothing
 			default:
 				panic("Unknown Winner state")
 			}
-		case <-time.After(5 * time.Second):
-			fmt.Println("INFO: Analysis complete.")
-			return
+		default:
+			select {
+			case node := <-lowPriWorkChan:
+				go generateNextNodes(node, unsortedWorkChan)
+			default:
+				//fmt.Println("DEBUG: No more nodes?")
+				//return
+			}
 		}
 	}
 }
