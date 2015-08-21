@@ -105,30 +105,57 @@ func generateNode(node *DecisionTreeNode, move *MoveParams) *DecisionTreeNode {
 	}
 }
 
-// Returns a map of "unique" CardInfo -> one instance of Card with that CardInfo
-func uniqueCardsInZone(gs *GameState, zone string) map[CardInfo]*Card {
+// Returns a slices of "unique" *Cards, per CardInfo
+func uniqueCardsInZone(gs *GameState, zone string) []*Card {
+	result := make([]*Card, 0)
 	allMinions := gs.CardsByZone[zone]
 	uniqueMinionInfo := make(map[CardInfo]*Card)
 	for minion := range allMinions {
-		uniqueMinionInfo[minion.getInfo()] = minion
+		if _, exists := uniqueMinionInfo[minion.getInfo()]; !exists {
+			result = append(result, minion)
+			uniqueMinionInfo[minion.getInfo()] = minion
+		}
 	}
-	return uniqueMinionInfo
+	return result
 }
 
-// Returns a map of "unique" CardInfo -> one instance of Card with that CardInfo
-// for the zone "OPPOSING PLAY", where we don't care about certain attributes of the card.
-func uniqueCardsInOpposingPlay(gs *GameState) map[CardInfo]*Card {
-    zone := "OPPOSING PLAY"
+// Returns a slices of "unique" *Cards, per CardInfo for the zone
+// "OPPOSING PLAY", where we don't care about certain attributes of the card.
+func uniqueCardsInOpposingPlay(gs *GameState) []*Card {
+	result := make([]*Card, 0)
+	zone := "OPPOSING PLAY"
 	allMinions := gs.CardsByZone[zone]
 	uniqueMinionInfo := make(map[CardInfo]*Card)
 	for minion := range allMinions {
-		uniqueMinionInfo[minion.getInfoAsEnemyMinion()] = minion
+		if _, exists := uniqueMinionInfo[minion.getInfoAsEnemyMinion()]; !exists {
+			result = append(result, minion)
+			uniqueMinionInfo[minion.getInfoAsEnemyMinion()] = minion
+		}
 	}
-	return uniqueMinionInfo
+	return result
 }
 
 func canCardAttack(card *Card) bool {
 	return !(card.NumAttacksThisTurn > 0 || (card.Exhausted && !card.Charge) || card.Frozen || card.Attack == 0)
+}
+
+// Options for benchmarking.
+type PruningOpts struct {
+	getCardsFromFriendlyZone func(gs *GameState, zone string) []*Card
+	getCardsInOpposingPlay   func(gs *GameState) []*Card
+}
+
+var GlobalPruningOpts PruningOpts
+
+func resetGlobalPruningOpts() {
+	GlobalPruningOpts = PruningOpts{
+		getCardsFromFriendlyZone: uniqueCardsInZone,
+		getCardsInOpposingPlay:   uniqueCardsInOpposingPlay,
+	}
+}
+
+func init() {
+	resetGlobalPruningOpts()
 }
 
 // Enumerate all of the possible next moves from the given GameState.
@@ -154,13 +181,13 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 	}
 
 	// Minions can attack minions or face.
-	for _, friendlyMinion := range uniqueCardsInZone(node.Gs, "FRIENDLY PLAY") {
+	for _, friendlyMinion := range GlobalPruningOpts.getCardsFromFriendlyZone(node.Gs, "FRIENDLY PLAY") {
 		if !canCardAttack(friendlyMinion) {
 			// This minion can't attack.
 			//fmt.Printf("DEBUG: %v is in play but can't attack for some reason.\n", friendlyMinion.Name)
 			continue
 		}
-		for _, enemyMinion := range uniqueCardsInOpposingPlay(node.Gs) {
+		for _, enemyMinion := range GlobalPruningOpts.getCardsInOpposingPlay(node.Gs) {
 			if enemyTauntExists && !enemyMinion.Taunt {
 				// This minion can't be attacked.
 				//fmt.Printf("DEBUG: %v is protected by a taunt minion.\n", enemyMinion.Name)
@@ -179,7 +206,7 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 
 	// Hero can attack minions or face with a weapon.
 	if canCardAttack(friendlyHero) {
-		for _, enemyMinion := range uniqueCardsInOpposingPlay(node.Gs) {
+		for _, enemyMinion := range GlobalPruningOpts.getCardsInOpposingPlay(node.Gs) {
 			if enemyTauntExists && !enemyMinion.Taunt {
 				// This minion can't be attacked.
 				//fmt.Printf("DEBUG: %v is protected by a taunt minion.\n", getPrettyCardDesc(enemyMinion)
@@ -198,7 +225,7 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 	// Spells, Minions, and Weapons can be played including targets maybe.
 	numFriendlyMinions := len(node.Gs.CardsByZone["FRIENDLY PLAY"])
 	availableMana := node.Gs.ManaMax - node.Gs.ManaUsed + node.Gs.ManaTemp
-	for _, cardInHand := range uniqueCardsInZone(node.Gs, "FRIENDLY HAND") {
+	for _, cardInHand := range GlobalPruningOpts.getCardsFromFriendlyZone(node.Gs, "FRIENDLY HAND") {
 		if cardInHand.Cost > availableMana {
 			// Too expensive.
 			//fmt.Printf("DEBUG: %v is too expensive to play.\n", getPrettyCardDesc(cardInHand)
@@ -242,7 +269,7 @@ func generateNextNodes(node *DecisionTreeNode, workChan chan<- *DecisionTreeNode
 }
 
 func WalkDecisionTree(gs *GameState, solutionChan chan<- *DecisionTreeNode, abortChan <-chan time.Time) {
-	workChan := make(chan *DecisionTreeNode, 1000)
+	workChan := make(chan *DecisionTreeNode, 1000000)
 	softTimeoutChan := time.After(time.Second * 70)
 	timeoutChan := time.After(time.Second * 300)
 

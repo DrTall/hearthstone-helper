@@ -3,8 +3,11 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 )
+
+var _ = fmt.Printf
 
 // Returns a filter function which returns true/false for whether a given
 // card can be the target of this one when it is played.
@@ -68,12 +71,17 @@ func taskmasterAction(gs *GameState, params *MoveParams) {
 }
 
 func whirlwindAction(gs *GameState, _ *MoveParams) {
+	//total := 0
 	for minion := range gs.CardsByZone["FRIENDLY PLAY"] {
+		//total += 1
+		//fmt.Printf("DEBUG: whirlwindAction sees %v friends\n", len(gs.CardsByZone["FRIENDLY PLAY"]))
 		gs.dealDamage(minion, 1)
 	}
 	for minion := range gs.CardsByZone["OPPOSING PLAY"] {
+		//total += 1
 		gs.dealDamage(minion, 1)
 	}
+	//fmt.Printf("DEBUG: whirlwindAction just did %v damage\n", total)
 }
 
 func getCardPlayedAction(card *Card) func(gs *GameState, params *MoveParams) {

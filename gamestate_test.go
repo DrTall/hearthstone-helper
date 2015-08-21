@@ -8,11 +8,11 @@ import (
 func createEmptyGameState() GameState {
 	gs := GameState{}
 	gs.resetGameState()
-    hero1 := gs.getOrCreateCard("HERO_01", 1)
-    hero2 := gs.getOrCreateCard("HERO_01", 2)
-    gs.moveCard(hero1, "FRIENDLY PLAY (Hero)")
-    gs.moveCard(hero2, "OPPOSING PLAY (Hero)")
-    return gs
+	hero1 := gs.getOrCreateCard("HERO_01", 1)
+	hero2 := gs.getOrCreateCard("HERO_02", 2)
+	gs.moveCard(hero1, "FRIENDLY PLAY (Hero)")
+	gs.moveCard(hero2, "OPPOSING PLAY (Hero)")
+	return gs
 }
 
 func TestDeepCopy(t *testing.T) {
@@ -129,13 +129,13 @@ func TestDedup(t *testing.T) {
 		t.Error()
 	}
 
-    if len(uniqueCardsInZone(&gs, "OPPOSING PLAY")) != 1 {
-        t.Error()
-    }
+	if len(uniqueCardsInZone(&gs, "OPPOSING PLAY")) != 1 {
+		t.Error()
+	}
 
-    murlocScout.Frozen = true
-    if len(uniqueCardsInZone(&gs, "OPPOSING PLAY")) != 2 {
-        t.Error()
-    }
+	murlocScout.Frozen = true
+	if len(uniqueCardsInZone(&gs, "OPPOSING PLAY")) != 2 {
+		t.Error()
+	}
 
 }

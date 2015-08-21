@@ -173,11 +173,12 @@ func runDeathrattleAction(gs *GameState, dyingMinion *Card) {
 	})
 }
 
-func (gs *GameState) CreateNewMinion(jsonId string, zone string) {
+func (gs *GameState) CreateNewMinion(jsonId string, zone string) *Card {
 	card := gs.getOrCreateCard(jsonId, gs.HighestCardId+1)
 	card.Exhausted = true
 	maybeTriggerWarsongCommander(gs, card)
 	gs.moveCard(card, zone)
+	return card
 }
 
 // Minion attack or weapon attack (modifies `gs` and the cards in it).
@@ -192,24 +193,18 @@ func (gs *GameState) dealDamage(target *Card, amount int32) {
 		return
 	}
 
+	target.JustTookDamage = true
 	target.Armor -= amount
 	if target.Armor < 0 {
 		target.Damage -= target.Armor
 		target.Armor = 0
 	}
 
-	// We're not bad people, but we did a bad thing...
-	// TODO: Implement some kind of generic listener framework someday.
-	if target.JsonCardId == "BRM_019" && !target.Silenced &&
-		target.Damage < target.Health && len(gs.CardsByZone[target.Zone]) < 7 { // Grim Patron
-		//fmt.Println("DEBUG: Everyone! Get in here!")
-		gs.CreateNewMinion("BRM_019", target.Zone)
-	}
 	if target.Type == "Minion" {
 		for friendlyMinion := range gs.CardsByZone["FRIENDLY PLAY"] {
 			if friendlyMinion.JsonCardId == "EX1_604" && !friendlyMinion.Silenced { // Frothing Berserker
-				//fmt.Println("DEBUG: My blade be thirsty!")
 				friendlyMinion.Attack += 1
+				//fmt.Printf("DEBUG: My blade be thirsty! Attack is now %v\n", friendlyMinion.Attack)
 			}
 		}
 		for enemyMinion := range gs.CardsByZone["OPPOSING PLAY"] {
@@ -239,19 +234,31 @@ func (gs *GameState) cleanupState() {
 		gs.Winner = FRIENDLY_VICTORY
 	}
 
+	friendlyHero.JustTookDamage = false
+	enemyHero.JustTookDamage = false
+
 	for minion, _ := range gs.CardsByZone["FRIENDLY PLAY"] {
-		if minion.PendingDestroy || (minion.Damage >= minion.Health) {
+		if minionNeedsKilling(minion) {
 			didAnything = true
 			//fmt.Println("Minion should die due to damage: ", minion)
 			gs.handleDeath(minion)
+		} else if minion.JustTookDamage && minion.JsonCardId == "BRM_019" &&
+			!minion.Silenced && len(gs.CardsByZone["FRIENDLY PLAY"]) < 7 {
+			// We're not bad people, but we did a bad thing...
+			// TODO: Implement some kind of generic listener framework someday.
+			//fmt.Println("DEBUG: Everyone! Get in here!")
+			didAnything = true
+			gs.CreateNewMinion("BRM_019", "FRIENDLY PLAY")
 		}
+		minion.JustTookDamage = false
 	}
 	for minion, _ := range gs.CardsByZone["OPPOSING PLAY"] {
-		if minion.PendingDestroy || (minion.Damage >= minion.Health) {
+		if minionNeedsKilling(minion) {
 			didAnything = true
 			//fmt.Println("Minion should die due to damage: ", minion)
 			gs.handleDeath(minion)
 		}
+		minion.JustTookDamage = false
 	}
 	if didAnything {
 		gs.cleanupState()
@@ -284,6 +291,7 @@ type Card struct {
 	Silenced           bool
 	Zone               string
 	PendingDestroy     bool // Internal. Should this minion be destroyed in the next cleanup step?
+	JustTookDamage     bool // Internal. Did this minion take damage since the last cleanup step?
 }
 
 // TODO (dz): this is kinda hacky... Card should really be a struct with just InstanceId + CardInfo,
@@ -310,7 +318,7 @@ type CardInfo struct {
 }
 
 func (c *Card) getInfo() CardInfo {
-	return CardInfo {
+	return CardInfo{
 		JsonCardId:         c.JsonCardId,
 		Type:               c.Type,
 		Name:               c.Name,
@@ -332,21 +340,15 @@ func (c *Card) getInfo() CardInfo {
 
 // for enemy minions, we don't care about JsonCardId.
 func (c *Card) getInfoAsEnemyMinion() CardInfo {
-	return CardInfo {
-		Type:               c.Type,
-		Name:               c.Name,
-		Cost:               c.Cost,
-		Attack:             c.Attack,
-		Health:             c.Health,
-		Armor:              c.Armor,
-		Damage:             c.Damage,
-		NumAttacksThisTurn: c.NumAttacksThisTurn,
-		Charge:             c.Charge,
-		Exhausted:          c.Exhausted,
-		Frozen:             c.Frozen,
-		Taunt:              c.Taunt,
-		Silenced:           c.Silenced,
-		Zone:               c.Zone,
-		PendingDestroy:     c.PendingDestroy,
+	return CardInfo{
+		Type:           c.Type,
+		Name:           c.Name,
+		Attack:         c.Attack,
+		Health:         c.Health,
+		Armor:          c.Armor,
+		Damage:         c.Damage,
+		Taunt:          c.Taunt,
+		Zone:           c.Zone,
+		PendingDestroy: c.PendingDestroy,
 	}
 }
