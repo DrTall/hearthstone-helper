@@ -49,7 +49,7 @@ func TestMove(t *testing.T) {
 		CardTwo:     nil,
 		Description: "test move",
 	}
-	gs.useCard(&moveParam)
+	useCard(&gs, &moveParam)
 	fmt.Println(gs)
 
 	// Card should no longer be in hand
@@ -80,7 +80,7 @@ func TestBattlecry(t *testing.T) {
 		CardTwo:     murloc,
 		Description: "play CruelTaskmaster from hand, targeting Gnomish Inventor with battlecry",
 	}
-	gs.useCard(&moveParam)
+	useCard(&gs, &moveParam)
 	fmt.Println(gs)
 
 	// Card should no longer be in hand

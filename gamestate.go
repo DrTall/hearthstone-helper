@@ -101,7 +101,7 @@ func useCard(gs *GameState, params *MoveParams) {
 		switch playCard.Type {
 		case "Minion":
 			// Warsong Commander
-			maybeTriggerWarsongCommander(playCard)
+			maybeTriggerWarsongCommander(gs, playCard)
 			// minion comes into play
 			gs.moveCard(playCard, "FRIENDLY PLAY")
 			playCard.Exhausted = !playCard.Charge
@@ -148,7 +148,7 @@ func useCard(gs *GameState, params *MoveParams) {
 	gs.cleanupState()
 }
 
-func maybeTriggerWarsongCommander(card *Card) {
+func maybeTriggerWarsongCommander(gs *GameState, card *Card) {
 	if card.Attack <= 3 {
 		for friendlyMinion := range gs.CardsByZone["FRIENDLY PLAY"] {
 			if friendlyMinion.JsonCardId == "EX1_084" && !friendlyMinion.Silenced {
@@ -176,7 +176,7 @@ func runDeathrattleAction(gs *GameState, dyingMinion *Card) {
 func (gs *GameState) CreateNewMinion(jsonId string, zone string) {
 	card := gs.getOrCreateCard(jsonId, gs.HighestCardId+1)
 	card.Exhausted = true
-	maybeTriggerWarsongCommander(card)
+	maybeTriggerWarsongCommander(gs, card)
 	gs.moveCard(card, zone)
 }
 
